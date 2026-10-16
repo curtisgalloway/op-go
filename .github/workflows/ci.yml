@@ -18,6 +18,8 @@ jobs:
           cache: false
       - run: test -z "$(gofmt -l cmd internal)"
       - run: go vet ./...
+      - name: Check for reachable vulnerabilities
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
       - name: Install isolated D-Bus test support
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install --yes dbus

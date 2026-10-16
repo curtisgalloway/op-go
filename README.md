@@ -14,7 +14,7 @@ see [validation status](VALIDATION.md) for the checks and remaining limits.
 
 ## Build
 
-Requires Go 1.26 or newer. macOS Keychain support also requires Apple's command-line
+Requires Go 1.26.9 or newer. macOS Keychain support also requires Apple's command-line
 developer tools and cgo (enabled by default for native Go builds). From the
 repository root:
 
@@ -127,6 +127,7 @@ meaning its outcome is unknown; inspect the store before retrying.
 go test ./...
 go test -race ./...
 go vet ./...
+go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 ```
 
 Tests use fake stores and credentials. Linux wire tests create a private D-Bus

@@ -11,6 +11,10 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
 
 ## Observed checks
 
+- Native Linux amd64 checks passed with Go 1.26.9 on 2026-10-16: formatting,
+  normal and race tests, vet, and build. The private D-Bus tests passed outside
+  the agent sandbox; the sandbox prevented their bus from starting. These use
+  fake Secret Service data, not an actual desktop keyring.
 - Native macOS build, `go vet ./...`, and `go test -race ./...` passed.
 - GitHub Actions run [38979510614](https://github.com/curtisgalloway/op-go/actions/runs/38979510614)
   passed on native macOS and Linux for commit `0a09523`, including race tests,
@@ -61,7 +65,10 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
   status, locked stores, duplicates, sanitized errors, and deadlines. Identical
   adapter/test source ran against a dedicated fake service on macOS with the race
   detector. Linux CI runs the original platform-specific tests with dbus-daemon.
-- `govulncheck` reported no known vulnerabilities in the current build graph.
+- On 2026-10-16, `govulncheck` v1.9.0 reported 21 reachable standard-library
+  vulnerabilities when built with Go 1.26.0. Raising the minimum Go version to
+  1.26.9 cleared the scan: no vulnerabilities found. CI now runs the same pinned
+  scanner on both platforms against the current vulnerability database.
 
 The automated tests do not read or modify the user's Keychain or desktop keyring.
 CI uses a private D-Bus instance and fake values. No real 1Password account is needed.
