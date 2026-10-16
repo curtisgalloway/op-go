@@ -5,13 +5,37 @@ system libraries. D-Bus is the local messaging protocol used by Linux Secret
 Service. See [GLOSSARY.md](GLOSSARY.md).
 
 This development implementation has automated evidence for its command and
-credential-transport behavior. It has not completed real-account or signed-release
-qualification. A green suite does not prove Keychain access after a binary upgrade
-or behavior of every Linux desktop keyring.
+credential-transport behavior and a macOS real-account smoke check. It has not
+completed signed-release qualification. A green suite does not prove Keychain
+access after a binary upgrade or behavior of every Linux desktop keyring.
 
 ## Observed checks
 
 - Native macOS build, `go vet ./...`, and `go test -race ./...` passed.
+- GitHub Actions run [38979510614](https://github.com/curtisgalloway/op-go/actions/runs/38979510614)
+  passed on native macOS and Linux for commit `0a09523`, including race tests,
+  vet, build, and the noninteractive command contract.
+- A manually authorized macOS Keychain check passed with disposable values:
+  enrollment, metadata lookup, overwrite, retrieval followed by expected SDK
+  authentication rejection, and removal. Enrollment was blocked inside the
+  agent sandbox and succeeded outside it. The temporary entry was removed.
+- An authorized live macOS run retrieved a service-account token from Keychain,
+  resolved a real application secret through the SDK, and executed a child that
+  verified a nonempty secret, absence of `OP_SERVICE_ACCOUNT_TOKEN`, and no open
+  descriptors above standard input/output/error. The known service-account token
+  was absent from 46 targeted `ps eww` samples spanning launch and child execution.
+  This sampling does not prove absence from every process-inspection interface
+  or cover the short-lived credential worker. The agent's preexisting inherited
+  token was removed from the launcher's environment; ancestor exposure remains.
+- A manually created Keychain entry was readable as metadata but denied token
+  access, even with the executable permitted and then all applications allowed.
+  Its access metadata included an Apple-only partition rule. With user approval,
+  it was replaced through `op-go enroll`; subsequent reads succeeded. The live
+  enrollment was retained at the user's request.
+- Live references using both vault/item IDs and both vault/item names succeeded.
+  An earlier all-name lookup and two mixed name/ID lookups failed. The official
+  CLI also initially failed a lookup with a vault name, then succeeded with IDs.
+  The cause of these lookup failures has not been established.
 - Linux amd64 and arm64 builds passed with cgo disabled. These are compilation
   checks, not evidence of native Linux execution.
 - Built-CLI smoke checks passed with a dummy token: metadata and dry-run JSON,
@@ -39,13 +63,11 @@ or behavior of every Linux desktop keyring.
   detector. Linux CI runs the original platform-specific tests with dbus-daemon.
 - `govulncheck` reported no known vulnerabilities in the current build graph.
 
-The tests do not read or modify the user's Keychain or desktop keyring. CI uses a
-private D-Bus instance and fake values. No real 1Password account is needed.
+The automated tests do not read or modify the user's Keychain or desktop keyring.
+CI uses a private D-Bus instance and fake values. No real 1Password account is needed.
 
 ## Checks required before a supported release
 
-- Execute the full suite on native Linux; CI is configured but was not run remotely
-  during local implementation.
 - Exercise dedicated test items in actual Keychain and Secret Service stores:
   enroll, read, overwrite, remove, locked-store refusal, and denial without prompts.
 - Verify Keychain item access with the chosen macOS signing identity and after an
@@ -53,11 +75,12 @@ private D-Bus instance and fake values. No real 1Password account is needed.
   compile but are deprecated by Apple; their behavior must be qualified on each
   supported macOS version.
 - Authenticate to 1Password with a dedicated, narrowly scoped test account and
-  resolve a test item. Verify descriptor hygiene after actual SDK network use and
-  timeout behavior during a stalled request.
+  resolve a dedicated test item. The live smoke check used an existing read-only
+  account and application item. Verify timeout behavior during a stalled request
+  and investigate the observed name/ID lookup failures.
 - Inspect process arguments/environments during enrollment, retrieval, and launch
-  with test sentinels on both operating systems. Current tests inspect constructed
-  environments and private transport, not every OS process-inspection interface.
+  with test sentinels on both operating systems. The macOS live launch sampling
+  above does not cover enrollment, every retrieval worker, or Linux inspection.
 
 Real-store and real-account checks are intentionally separate from default tests
 and require explicit authorization. No credentials are embedded in examples,

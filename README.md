@@ -44,6 +44,12 @@ text, or environment variable. Overwriting an existing token requires terminal
 confirmation or `--yes`. Enrollment stores the token but does not authenticate
 it online.
 
+Use `op-go enroll` to provision the macOS entry. An entry created manually in
+Keychain Access can be visible to `doctor` but deny reads with status 12, even
+after adding the executable to its allowed applications. Keychain partition
+rules can impose additional restrictions; allowing all applications did not
+resolve this in manual testing. `op-go` suppresses interactive permission dialogs.
+
 Create `secrets.env` with references such as:
 
 ```dotenv
