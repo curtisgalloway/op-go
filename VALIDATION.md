@@ -15,6 +15,23 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
   normal and race tests, vet, and build. The private D-Bus tests passed outside
   the agent sandbox; the sandbox prevented their bus from starting. These use
   fake Secret Service data, not an actual desktop keyring.
+- Authorized real-store checks passed against GNOME Keyring 50.0 on Linux on
+  2026-10-16, using disposable values, a private D-Bus session, and temporary
+  keyring directories. Enrollment, metadata, exact retrieval through the
+  credential worker, overwrite consent, replacement, removal consent, removal,
+  and confirmed absence passed. Locked metadata/read/enroll/remove operations
+  returned status 11 promptly. A separate private D-Bus policy denied GetSecret;
+  the credential worker returned status 12. This verifies bus-policy denial,
+  not every desktop keyring's application-access policy. Temporary keyrings were
+  removed and their daemons stopped.
+- The Linux launcher retrieved a disposable invalid token from the real isolated
+  keyring and returned SDK authentication status 10 without launching its child.
+  Process-tree sampling during enrollment, retrieval, replacement, removal, and
+  this failed launch found no dummy-token sentinel in sampled process arguments
+  or environments. Sampling is not exhaustive and does not establish successful
+  real-account launch behavior. The existing desktop keyring was locked; its
+  metadata check returned status 11. It was not unlocked or modified, and no
+  real-account Linux check has completed.
 - Native macOS build, `go vet ./...`, and `go test -race ./...` passed.
 - GitHub Actions run [38979510614](https://github.com/curtisgalloway/op-go/actions/runs/38979510614)
   passed on native macOS and Linux for commit `0a09523`, including race tests,
