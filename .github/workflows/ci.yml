@@ -18,7 +18,10 @@ jobs:
           cache: false
       - run: test -z "$(gofmt -l cmd internal)"
       - run: go vet ./...
-      - run: go test ./...
+      - name: Install isolated D-Bus test support
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes dbus
+      - run: go test -race ./...
       - run: go build -o bin/op-go ./cmd/op-go
       - name: Noninteractive command contract
         shell: bash
@@ -27,8 +30,8 @@ jobs:
           export NO_COLOR=1
           bin/op-go --skill </dev/null | cat > skill-output.md
           set +e
-          bin/op-go doctor --json </dev/null | cat > doctor.json
+          bin/op-go doctor --backend file --token-file /nonexistent/op-go-token --json </dev/null | cat > doctor.json
           result=${PIPESTATUS[0]}
           set -e
           test "$result" -eq 3
-          python3 -c 'import json; assert json.load(open("doctor.json"))["ready"] is False'
+          python3 -c 'import json; assert json.load(open("doctor.json"))["ok"] is False'

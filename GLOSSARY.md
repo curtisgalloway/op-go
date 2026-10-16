@@ -11,3 +11,8 @@
 - **Environment:** Named string values passed to a program when it starts.
 - **exec:** A Unix operation that replaces the current program with another.
 - **CLI:** A command-line interface.
+- **cgo:** Go's interface to native system libraries, used here for macOS Keychain.
+- **D-Bus:** A local messaging system used to communicate with Linux Secret Service.
+- **WebAssembly:** A portable executable format used internally by the 1Password SDK.
+- **File descriptor:** A process-local handle for an open file, socket, or pipe.
+- **Close-on-exec:** A flag that closes an open handle when a process replaces itself.

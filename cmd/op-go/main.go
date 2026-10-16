@@ -6,7 +6,13 @@ package main
 
 import (
 	"github.com/curtisgalloway/op-go/internal/cli"
+	"github.com/curtisgalloway/op-go/internal/store"
 	"os"
 )
 
-func main() { os.Exit(cli.Run(os.Args[1:], os.Stdout, os.Stderr)) }
+func main() {
+	if handled, code := store.Worker(os.Args[1:]); handled {
+		os.Exit(code)
+	}
+	os.Exit(cli.Run(os.Args[1:], os.Stdout, os.Stderr))
+}

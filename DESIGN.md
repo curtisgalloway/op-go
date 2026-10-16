@@ -5,9 +5,9 @@ The *SDK* is the official Go library. *exec* replaces the launcher process with
 the requested program. Keychain and Secret Service are operating-system
 credential stores. See [GLOSSARY.md](GLOSSARY.md).
 
-This is a proposed design, not an implemented security guarantee. The current
-repository is an informational CLI scaffold. Platform integration and packaging
-must be verified before publishing supported-platform or security claims.
+This design is implemented as a development CLI. Platform integration and
+packaging must be verified before publishing release security claims. See
+[VALIDATION.md](VALIDATION.md) for observed evidence and remaining checks.
 
 ## Objective and boundary
 
@@ -43,7 +43,9 @@ nonsecret errors without waiting indefinitely for an unattended prompt. Do not
 claim a stored token is valid unless a documented harmless check has succeeded.
 Run and doctor never request an operating-system unlock prompt. Enrollment
 also requires an already-unlocked store in v1; users unlock it separately.
-Bound credential-store operations to 5 seconds and SDK authentication/resolution
+Use short-lived self-invoked helpers with private request/response pipes for
+all store calls, including file reads; kill and reap them on timeout, without token arguments,
+environment variables, or standard-output transport. Bound credential-store operations to 5 seconds and SDK authentication/resolution
 to a configurable total timeout, default 30 seconds. Verify the selected APIs
 can enforce these bounds before shipping. Doctor is offline by default and
 must not retrieve token values to check setup.
