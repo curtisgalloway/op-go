@@ -24,6 +24,7 @@ type request struct {
 	Path      string
 	Operation string
 	Token     string
+	Password  []byte
 	Replace   bool
 }
 type response struct {
@@ -137,6 +138,19 @@ func (s nativeStore) Status(ctx context.Context) (bool, error) {
 	r, e := s.call(ctx, request{Operation: "status"})
 	return r.Present, e
 }
+
+func (s nativeStore) CheckUnlock(ctx context.Context) error {
+	_, err := s.call(ctx, request{Operation: "unlock-check"})
+	return err
+}
+
+func (s nativeStore) Unlock(ctx context.Context, password []byte) error {
+	if len(password) == 0 || len(password) > maxToken {
+		return ErrInvalidFile
+	}
+	_, err := s.call(ctx, request{Operation: "unlock", Password: password})
+	return err
+}
 func (s nativeStore) Read(ctx context.Context) (string, error) {
 	r, e := s.call(ctx, request{Operation: "read"})
 	return r.Token, e
@@ -199,6 +213,10 @@ func Worker(args []string) (bool, int) {
 }
 
 func workerOperation(ctx context.Context, req request) (response, error) {
+	if req.Operation == "unlock" || req.Operation == "unlock-check" {
+		defer clear(req.Password)
+		return response{}, unlockOperation(ctx, req)
+	}
 	if req.Backend != "file" {
 		return nativeOperation(ctx, req)
 	}

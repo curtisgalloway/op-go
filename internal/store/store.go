@@ -31,6 +31,12 @@ type Store interface {
 	Delete(context.Context) error
 }
 
+// Unlocker is optional: only supported stores can accept a terminal password.
+type Unlocker interface {
+	CheckUnlock(context.Context) error
+	Unlock(context.Context, []byte) error
+}
+
 func Open(backend, path string) (Store, error) {
 	if backend == "" {
 		switch runtime.GOOS {

@@ -41,8 +41,25 @@ Never accept the token as a command-line flag or environment fallback. Overwrite
 requires explicit consent. Absent or locked stores must produce actionable,
 nonsecret errors without waiting indefinitely for an unattended prompt. Do not
 claim a stored token is valid unless a documented harmless check has succeeded.
-Run and doctor never request an operating-system unlock prompt. Enrollment
-also requires an already-unlocked store in v1; users unlock it separately.
+Run and doctor never request an operating-system unlock prompt. On Linux,
+interactive enrollment may offer to unlock an existing GNOME login keyring;
+the user must confirm because unlocking also exposes its other credentials to
+applications running as that user. Explicit `unlock` reads the password from a
+terminal with echo disabled. Piped enrollment never unlocks. Other providers
+must be unlocked separately. No command opens a graphical unlock dialog.
+
+GNOME terminal unlock requires the existing default collection to be the login
+keyring. It checks that GNOME Keyring and Secret Service share a bus owner and
+that GNOME's private password-unlock extension has the expected method signature.
+A short-lived worker sends the password in a Secret Service session to that
+unique bus owner, then checks the original collection's lock state. Passwords
+travel through private worker pipes and the authenticated local bus, never
+arguments or environments. As with token retrieval, same-user bus inspection
+is outside the threat model. The extension is not a stable API; unsupported
+services are refused before requesting a password. The command makes one attempt,
+never retries authentication, and does not configure services or automatic unlocking.
+Provider restarts or concurrent keyring changes can invalidate these checks;
+same-user malicious interference remains outside the protection boundary.
 Use short-lived self-invoked helpers with private request/response pipes for
 all store calls, including file reads; kill and reap them on timeout, without token arguments,
 environment variables, or standard-output transport. Bound credential-store operations to 5 seconds and SDK authentication/resolution

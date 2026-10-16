@@ -32,6 +32,18 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
   real-account launch behavior. The existing desktop keyring was locked; its
   metadata check returned status 11. It was not unlocked or modified, and no
   real-account Linux check has completed.
+- The SSH terminal workflow passed against an isolated GNOME Keyring 50.0:
+  explicit `unlock`, enrollment's unlock offer, separate overwrite consent,
+  hidden keyring-password and token input, exact token readback, and one
+  wrong-password attempt returning status 11 without retrying. Terminal echo
+  was restored after SIGINT, SIGTERM, and SIGHUP while waiting for a password.
+  Automated fake-service tests cover the private worker's password transport,
+  extension signature checks, refusal of unsupported providers, access denial,
+  post-unlock lock-state verification, and deadlines. This uses GNOME's private
+  password-unlock D-Bus extension, not the standard graphical prompt flow;
+  compatibility with other GNOME Keyring versions remains unqualified.
+  The actual desktop keyring also passed unlock preflight and reached the hidden
+  password prompt; it was canceled before password input, with echo restored.
 - Native macOS build, `go vet ./...`, and `go test -race ./...` passed.
 - GitHub Actions run [38979510614](https://github.com/curtisgalloway/op-go/actions/runs/38979510614)
   passed on native macOS and Linux for commit `0a09523`, including race tests,

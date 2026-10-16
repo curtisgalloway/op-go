@@ -5,7 +5,7 @@
 package cli
 
 import (
-	"bufio"
+	"bytes"
 	"context"
 	_ "embed"
 	"encoding/json"
@@ -38,6 +38,7 @@ Usage:
   op-go run --env-file PATH [options] -- command args
   op-go dry-run --env-file PATH [options] [--json] -- command args
   op-go enroll [--stdin] [--yes] [--dry-run] [--json] [options]
+  op-go unlock [--dry-run] [--json] [--backend secret-service]
   op-go remove [--yes] [--dry-run] [--json] [options]
   op-go doctor [--json] [options]
   op-go --help | --version | --skill
@@ -49,7 +50,10 @@ Options:
 
 Enrollment reads hidden terminal input unless --stdin is explicit.
 Overwrite/removal require --yes or terminal confirmation; stdin tokens cannot
-provide confirmation. Stores must already be unlocked. Doctor is offline and
+provide confirmation. On Linux, unlock reads the GNOME login keyring password
+from a terminal; interactive enrollment offers to unlock a locked keyring.
+Unlocking makes the keyring available to other applications for your user too.
+Run, doctor, and piped enrollment never unlock or prompt. Doctor is offline and
 reads metadata only. Dry-run does not retrieve or resolve secrets or print values.
 Run rejects --json; after exec the target owns stdout, stderr, and exit status.
 Application secrets enter the target environment and may be visible in ps.
@@ -75,7 +79,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	return run(args, stdout, stderr, dependencies{
 		open: store.Open, lookup: os.LookupEnv, input: os.Stdin,
 		terminal: term.IsTerminal(int(os.Stdin.Fd())),
-		password: func() ([]byte, error) { return term.ReadPassword(int(os.Stdin.Fd())) },
+		password: func() ([]byte, error) { return readTerminalPassword(int(os.Stdin.Fd())) },
 	})
 }
 
@@ -99,7 +103,7 @@ func run(args []string, stdout, stderr io.Writer, d dependencies) int {
 		return 0
 	}
 	command := args[0]
-	management := command == "enroll" || command == "remove" || command == "doctor" || command == "dry-run"
+	management := command == "enroll" || command == "remove" || command == "doctor" || command == "dry-run" || command == "unlock"
 	wantsJSON := false
 	for _, a := range args[1:] {
 		if a == "--" {
@@ -137,6 +141,8 @@ func run(args []string, stdout, stderr io.Writer, d dependencies) int {
 	}
 	if command == "enroll" || command == "remove" {
 		fs.BoolVar(&o.yes, "yes", false, "")
+	}
+	if command == "enroll" || command == "remove" || command == "unlock" {
 		fs.BoolVar(&o.dry, "dry-run", false, "")
 	}
 	if command == "enroll" {
@@ -158,6 +164,9 @@ func run(args []string, stdout, stderr io.Writer, d dependencies) int {
 	}
 	if (o.backend == "file") != (o.tokenFile != "") {
 		return fail(2, "--token-file is required only with --backend file")
+	}
+	if command == "unlock" && (runtime.GOOS != "linux" || o.backend != "secret-service") {
+		return fail(2, "terminal unlock requires Linux GNOME Keyring with --backend secret-service")
 	}
 	if command != "run" && command != "dry-run" && fs.NArg() != 0 {
 		return fail(2, "unexpected positional arguments")
@@ -221,9 +230,20 @@ func run(args []string, stdout, stderr io.Writer, d dependencies) int {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	present, err := s.Status(ctx)
 	cancel()
+	if errors.Is(err, store.ErrLocked) && (command == "unlock" || command == "enroll" && runtime.GOOS == "linux" && o.backend == "secret-service" && d.terminal && !o.stdin) {
+		if code, message := unlockStore(s, d, stderr, command == "enroll"); code != 0 {
+			return fail(code, message)
+		}
+		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+		present, err = s.Status(ctx)
+		cancel()
+	}
 	if err != nil {
 		code, msg := storeFailure(err)
 		return fail(code, msg)
+	}
+	if command == "unlock" {
+		return emit(map[string]any{"ok": true, "operation": "unlock", "backend": o.backend}, "credential store unlocked")
 	}
 	if command == "doctor" {
 		if !present {
@@ -236,8 +256,7 @@ func run(args []string, stdout, stderr io.Writer, d dependencies) int {
 			return fail(2, "explicit --yes required without a confirmation terminal; token input cannot provide consent")
 		}
 		fmt.Fprint(stderr, "Confirm credential "+command+" (type yes): ")
-		answer, err := bufio.NewReader(d.input).ReadString('\n')
-		if err != nil || strings.TrimSpace(answer) != "yes" {
+		if !confirmed(d.input) {
 			return fail(2, "credential operation not confirmed")
 		}
 	}
@@ -280,6 +299,68 @@ func run(args []string, stdout, stderr io.Writer, d dependencies) int {
 		return fail(code, msg)
 	}
 	return emit(map[string]any{"ok": true, "operation": "enroll", "backend": o.backend, "online_check": false}, "credential enrolled; token validity not checked")
+}
+
+func unlockStore(s store.Store, d dependencies, stderr io.Writer, offer bool) (int, string) {
+	if !d.terminal {
+		return 2, "unlock requires an interactive terminal; run op-go unlock from your SSH terminal"
+	}
+	u, ok := s.(store.Unlocker)
+	if !ok {
+		return 3, "terminal unlock requires an existing GNOME login keyring"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	err := u.CheckUnlock(ctx)
+	cancel()
+	if err != nil {
+		if errors.Is(err, store.ErrUnavailable) {
+			return 3, "terminal unlock unavailable; requires an existing GNOME login keyring and its password-unlock extension"
+		}
+		return storeFailure(err)
+	}
+	fmt.Fprintln(stderr, "Unlocking the GNOME login keyring also makes its credentials available to other applications for your user.")
+	if offer {
+		fmt.Fprint(stderr, "Unlock keyring to continue enrollment? (type yes): ")
+		if !confirmed(d.input) {
+			return 11, "credential store remains locked; unlock not confirmed"
+		}
+	}
+	fmt.Fprint(stderr, "GNOME login keyring password: ")
+	password, err := d.password()
+	fmt.Fprintln(stderr)
+	defer clear(password)
+	if err != nil {
+		return 20, "could not read keyring password"
+	}
+	if len(password) == 0 || len(password) > 65536 || bytes.IndexByte(password, 0) >= 0 {
+		return 2, "keyring password must be nonempty, at most 64 KiB, and contain no NUL bytes"
+	}
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	err = u.Unlock(ctx, password)
+	cancel()
+	if errors.Is(err, store.ErrLocked) {
+		return 11, "keyring remains locked; password was not accepted; no retry attempted"
+	}
+	if err != nil {
+		return storeFailure(err)
+	}
+	return 0, ""
+}
+
+// Read only the confirmation line; never buffer a following hidden password.
+func confirmed(input io.Reader) bool {
+	var answer []byte
+	var b [1]byte
+	for len(answer) < 32 {
+		if _, err := io.ReadFull(input, b[:]); err != nil {
+			return false
+		}
+		if b[0] == '\n' {
+			return strings.TrimSpace(string(answer)) == "yes"
+		}
+		answer = append(answer, b[0])
+	}
+	return false
 }
 
 func validToken(data []byte) (string, bool) {

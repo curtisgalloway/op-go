@@ -24,6 +24,8 @@ const fakeSession = dbus.ObjectPath("/org/freedesktop/secrets/session/test")
 // FakeSecretService lives exclusively on a dedicated test bus. Its counters
 // make forbidden value reads and interactive operations observable.
 type FakeSecretService struct {
+	conn            *dbus.Conn
+	loginAlias      bool
 	mu              sync.Mutex
 	calls           map[string]int
 	token           string
@@ -38,13 +40,13 @@ func (f *FakeSecretService) record(name string) { f.calls[name]++ }
 func (f *FakeSecretService) ReadAlias(alias string) (dbus.ObjectPath, *dbus.Error) {
 	f.mu.Lock()
 	f.record("ReadAlias")
-	delay, failure := f.delay, f.failure
+	delay, failure, loginAlias := f.delay, f.failure, f.loginAlias
 	f.mu.Unlock()
 	time.Sleep(delay)
 	if failure != "" {
 		return "/", dbus.NewError(failure, []any{"sentinel secret error"})
 	}
-	if alias != "default" {
+	if alias != "default" && !(alias == "login" && loginAlias) {
 		return "/", nil
 	}
 	return fakeCollection, nil
@@ -169,7 +171,7 @@ func privateSecretService(t *testing.T) *FakeSecretService {
 		t.Fatal("cannot connect to private bus")
 	}
 	t.Cleanup(func() { conn.Close() })
-	fake := &FakeSecretService{calls: map[string]int{}, token: "sentinel", count: 1}
+	fake := &FakeSecretService{conn: conn, calls: map[string]int{}, token: "sentinel", count: 1}
 	for _, entry := range []struct {
 		path  dbus.ObjectPath
 		iface string

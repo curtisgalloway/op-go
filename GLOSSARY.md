@@ -7,6 +7,8 @@
 - **SDK:** A software development kit; here, the official Go library for 1Password.
 - **Keychain:** The macOS credential storage service.
 - **Secret Service:** The Linux desktop protocol for storing credentials through a session service.
+- **GNOME Keyring:** A Linux credential-store implementation of Secret Service. Its login keyring is an encrypted collection normally unlocked during desktop login.
+- **SSH:** Secure Shell, used to open a terminal session on another machine. SSH login does not necessarily unlock a desktop keyring.
 - **Headless:** Running without an interactive desktop session.
 - **Environment:** Named string values passed to a program when it starts.
 - **exec:** A Unix operation that replaces the current program with another.

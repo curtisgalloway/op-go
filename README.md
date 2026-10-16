@@ -32,7 +32,8 @@ but its Keychain backend reports unavailable.
 Start from a shell where `OP_SERVICE_ACCOUNT_TOKEN` is not exported. The tool
 rejects that variable, even when empty; removing it cannot undo exposure in an
 already-running ancestor process. Unlock the operating-system credential store
-before enrollment. `op-go` never opens an unlock dialog.
+before enrollment, or use the Linux terminal workflow below. `op-go` never opens
+a graphical unlock dialog.
 
 ```sh
 ./bin/op-go enroll
@@ -43,6 +44,38 @@ pipe, use `enroll --stdin`; never put the token in an argument, shell command
 text, or environment variable. Overwriting an existing token requires terminal
 confirmation or `--yes`. Enrollment stores the token but does not authenticate
 it online.
+
+### Linux enrollment over SSH
+
+SSH (Secure Shell) gives you a remote terminal, but may leave the desktop keyring
+locked. With GNOME Keyring, the Linux credential store installed on many desktops,
+run `op-go enroll` in an interactive terminal. If the existing login keyring is
+locked, enrollment asks whether to unlock it, reads its password with echo off,
+then asks for the service-account token with echo off. Unlocking also makes that
+keyring's other credentials available to applications running as your user.
+
+To unlock an already-enrolled keyring for subsequent commands:
+
+```sh
+op-go unlock
+```
+
+The keyring password is usually your login password; it is not the 1Password
+token. A wrong password stops the command without retrying. Passwords travel
+through private worker pipes and the local session bus, never command arguments
+or environment variables. Interrupting password input restores terminal echo.
+
+This requires an existing GNOME login keyring selected as the default collection,
+a running GNOME Keyring daemon, and access to its local session bus. Terminal
+unlock uses GNOME's private password-unlock extension, checks its interface
+before requesting a password, and refuses if unavailable. This extension is
+not a stable cross-provider API. It does not install services, create keyrings,
+change passwords, or
+configure automatic unlocking after a reboot. Other Secret Service providers
+must be unlocked using their own tools. `run`, `doctor`, and `enroll --stdin`
+remain noninteractive and return status 11 when the store is locked. `unlock`
+requires a terminal when a password is needed; it has no password flag or stdin
+mode. `unlock --dry-run` does not access the store.
 
 Use `op-go enroll` to provision the macOS entry. An entry created manually in
 Keychain Access can be visible to `doctor` but deny reads with status 12, even

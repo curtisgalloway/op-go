@@ -22,6 +22,7 @@ op-go --version
 op-go --skill
 op-go doctor --json
 op-go enroll
+op-go unlock
 op-go enroll --stdin --yes
 op-go remove --yes
 op-go dry-run --env-file .env --json -- program
@@ -40,10 +41,20 @@ Enrollment accepts hidden terminal input, or explicit `--stdin` with at most
 and invalid UTF-8 are rejected. Tokens cannot be passed as flags or read from environment variables.
 An existing token requires `--yes` or terminal confirmation to overwrite. Removal
 has the same consent requirement. Stdin token input cannot double as consent.
-The store must already be unlocked; unlock it separately. Enrollment does not
+On Linux with GNOME Keyring (a Secret Service provider), interactive enrollment
+offers to unlock the existing login keyring after explicit confirmation. Unlocking
+makes its other credentials available to applications running as the same user.
+`op-go unlock` explicitly unlocks it. Both read the keyring password from a
+terminal with echo disabled, use private worker pipes and local D-Bus rather than arguments or environment,
+and make only one password attempt. The login keyring must already exist and
+be the default collection; its daemon and local session bus must be available.
+The GNOME-specific password-unlock extension is checked before input and is
+not a stable cross-provider API; unsupported services are refused.
+Other providers must be unlocked separately. Run, doctor, and `enroll --stdin`
+never unlock. Unlock has no password flag or stdin mode. Enrollment does not
 validate the token online.
 
-Enrollment and removal accept `--dry-run`. They report the operation and backend
+Enrollment, removal, and unlock accept `--dry-run`. They report the operation and backend
 without opening the store. Standalone dry-run validates the environment file and
 executable and reports key names, never values, references, or command arguments.
 Doctor reads credential metadata only: no token retrieval or network access.
@@ -70,7 +81,7 @@ Before execution, launcher diagnostics go to stderr without raw SDK or OS errors
 | 2 | Invalid arguments, token input, or missing consent | Correct invocation |
 | 3 | Missing store, token, or execution precondition | Configure the prerequisite |
 | 10 | 1Password authentication failed | Check the enrolled token |
-| 11 | Credential store locked | Unlock it separately |
+| 11 | Credential store locked | Use `op-go unlock` for GNOME Keyring, or the provider's own tools |
 | 12 | Credential access or file policy denied | Correct access and file protection |
 | 20 | Operation failed | Inspect the sanitized diagnostic |
 | 22 | Credential mutation interrupted or response lost; outcome unknown | Inspect metadata before retrying |
