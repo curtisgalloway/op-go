@@ -26,6 +26,7 @@ def smoke(binary, version, directory):
         result = subprocess.run(
             [str(binary), *map(str, arguments)],
             env={**environment, **(extra_env or {})},
+            cwd=directory,
             capture_output=True,
             text=True,
             timeout=30,
