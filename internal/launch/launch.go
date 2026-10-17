@@ -243,7 +243,7 @@ func (p *Prepared) run(ctx context.Context, credentials store.Store, timeout tim
 				if !ok {
 					v, err = r.Resolve(networkCtx, e.value)
 					if err != nil {
-						done <- result{nil, safeSDKError(err, 3, "secret resolution failed")}
+						done <- result{nil, safeSDKError(err, 20, "secret resolution failed; SDK did not provide a supported error category")}
 						return
 					}
 					cache[e.value] = v

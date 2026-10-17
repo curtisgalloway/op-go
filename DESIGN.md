@@ -89,6 +89,12 @@ except the line terminator. Reject export prefixes and whitespace around keys.
 Support one explicitly supplied environment file initially; its entries override
 inherited values. Do not silently inherit syntax from a dotenv dependency.
 Resolve all references before execution; any failure prevents command launch.
+Use the SDK structured `ResolveAll` response for one reference at a time, preserving
+sequential fail-fast behavior without retries. Classify only known error tags;
+never infer categories by matching raw provider text. Missing or ambiguous
+references return status 3, malformed references return 2, and unclassified
+resolution failures return 20. Missing or contradictory SDK responses also fail
+closed. Empty successful values remain valid.
 
 Build the child environment deliberately. Never add the token, and remove known
 1Password authentication variables: OP_SERVICE_ACCOUNT_TOKEN, OP_CONNECT_TOKEN,

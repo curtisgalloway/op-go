@@ -87,6 +87,12 @@ Before execution, launcher diagnostics go to stderr without raw SDK or OS errors
 | 22 | Credential mutation interrupted or response lost; outcome unknown | Inspect metadata before retrying |
 | 23 | 1Password rate limit reached | Retry later |
 
+Secret lookup diagnostics distinguish missing vaults, items, fields, sections, and
+ambiguous names. Use IDs to disambiguate names. Unclassified SDK resolution errors
+return 20; the SDK may not distinguish authentication, access, and transport
+failures in these errors. Raw provider messages are never printed. Empty fields
+are valid and are exported as empty environment variables. No lookup is retried.
+
 After execution, these numbers may also be target exit codes. An offline check
 does not guarantee later execution will succeed.
 

@@ -44,11 +44,19 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
   name/ID combinations using both shared and fresh SDK clients (eight reads),
   plus separate cold processes using all names and all IDs (two reads). Every
   result matched the empty field confirmed by direct item retrieval. These
-  checks did not reproduce or explain the intermittent failures. Unrecognized
-  SDK resolution errors currently collapse to status 3, so this status alone
-  cannot distinguish a missing reference from an operational or authentication
-  failure. A future reproduction needs sanitized error-type/category evidence;
+  checks did not reproduce or explain the intermittent failures. At the time, unrecognized
+  SDK resolution errors collapsed to status 3, so that status alone could not
+  distinguish a missing reference from an operational or authentication failure.
+  Resolution now uses the SDK structured-response API: missing and ambiguous
+  references receive specific sanitized diagnostics; unclassified failures
+  return status 20. A future reproduction still needs error-category evidence;
   the successful checks do not establish that IDs eliminate the failure.
+- The structured-resolution change passed normal and race tests, vet, formatting,
+  and a native Linux build. Fake responses cover empty values, missing and
+  contradictory results, reference error categories, sanitized unknown errors,
+  and refusal to retry or launch after failures. Two authorized live checks
+  through the changed API confirmed delivery of the existing empty field and
+  status 3 with a field-not-found diagnostic for the nonexistent password field.
 - The SSH terminal workflow passed against an isolated GNOME Keyring 50.0:
   explicit `unlock`, enrollment's unlock offer, separate overwrite consent,
   hidden keyring-password and token input, exact token readback, and one
