@@ -4,8 +4,10 @@
 package store
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -121,5 +123,94 @@ func TestUnlockDeadline(t *testing.T) {
 	}
 	if time.Since(start) > time.Second {
 		t.Fatal("deadline not enforced")
+	}
+}
+
+func exposePasswordUnlock(t *testing.T, f *FakeSecretService) {
+	t.Helper()
+	owner, err := f.conn.RequestName("org.gnome.keyring", dbus.NameFlagDoNotQueue)
+	if err != nil || owner != dbus.RequestNameReplyPrimaryOwner {
+		t.Fatal("cannot own fake GNOME name")
+	}
+	u := &FakeUnlock{fake: f}
+	if err := f.conn.Export(u, secretRoot, gnomeUnlockInterface); err != nil {
+		t.Fatal(err)
+	}
+	node := &introspect.Node{Interfaces: []introspect.Interface{{Name: gnomeUnlockInterface, Methods: introspect.Methods(u)}}}
+	if err := f.conn.Export(introspect.NewIntrospectable(node), secretRoot, "org.freedesktop.DBus.Introspectable"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func assertNoPasswordSession(t *testing.T, f *FakeSecretService) {
+	t.Helper()
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, name := range []string{"OpenSession", "UnlockWithMasterPassword", "Prompt", "GetSecret"} {
+		if f.calls[name] != 0 {
+			t.Errorf("unexpected %s call", name)
+		}
+	}
+}
+
+func TestUnlockRejectsMismatchedBusOwners(t *testing.T) {
+	f := privateSecretService(t)
+	other, err := dbus.Connect(os.Getenv("DBUS_SESSION_BUS_ADDRESS"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer other.Close()
+	owner, err := other.RequestName("org.gnome.keyring", dbus.NameFlagDoNotQueue)
+	if err != nil || owner != dbus.RequestNameReplyPrimaryOwner {
+		t.Fatal("cannot own distinct fake GNOME name")
+	}
+	for _, op := range []string{"unlock-check", "unlock"} {
+		err := unlockOperation(context.Background(), request{Backend: "secret-service", Operation: op, Password: []byte("password-sentinel")})
+		if !errors.Is(err, ErrUnavailable) {
+			t.Fatalf("%s: %v", op, err)
+		}
+	}
+	assertNoPasswordSession(t, f)
+}
+
+func TestUnlockRejectsNonLoginDefaultCollection(t *testing.T) {
+	for _, path := range []dbus.ObjectPath{"/", "/org/freedesktop/secrets/collection/other"} {
+		t.Run(string(path), func(t *testing.T) {
+			f := privateSecretService(t)
+			exposePasswordUnlock(t, f)
+			f.mu.Lock()
+			f.loginPath = path
+			f.mu.Unlock()
+			for _, op := range []string{"unlock-check", "unlock"} {
+				err := unlockOperation(context.Background(), request{Backend: "secret-service", Operation: op, Password: []byte("password-sentinel")})
+				if !errors.Is(err, ErrUnavailable) {
+					t.Fatalf("%s: %v", op, err)
+				}
+			}
+			assertNoPasswordSession(t, f)
+		})
+	}
+}
+
+func TestUnlockRejectsInvalidPasswordBeforeSession(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		password []byte
+	}{
+		{"empty", nil}, {"NUL", []byte("fake\x00password")}, {"oversized", bytes.Repeat([]byte("x"), maxToken+1)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := privateSecretService(t)
+			exposePasswordUnlock(t, f)
+			f.mu.Lock()
+			f.loginAlias = true
+			f.locked = true
+			f.mu.Unlock()
+			err := unlockOperation(context.Background(), request{Backend: "secret-service", Operation: "unlock", Password: tc.password})
+			if !errors.Is(err, ErrInvalidFile) {
+				t.Fatalf("invalid password: %v", err)
+			}
+			assertNoPasswordSession(t, f)
+		})
 	}
 }

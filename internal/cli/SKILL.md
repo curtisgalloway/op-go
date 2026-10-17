@@ -71,8 +71,10 @@ located using the original PATH before applying those overrides.
 Reference names support ASCII letters, digits, spaces, `_`, `.`, and `-`.
 For names containing other characters (for example, a colon in an item title),
 use that component's ID. Percent-encoding is not supported. `op-go` rejects
-unsupported name characters locally, before reading credentials. Names with
-spaces are written directly in the environment file without shell quotes.
+unsupported name characters locally, before reading credentials. Query parameter
+validation still occurs in the SDK during resolution; dry-run does not validate
+the complete provider query grammar. Names with spaces are written directly in
+the environment file without shell quotes.
 See [1Password reference syntax](https://www.1password.dev/cli/secret-reference-syntax).
 
 ## Output and exit status

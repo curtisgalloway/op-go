@@ -96,7 +96,10 @@ sequential fail-fast behavior without retries. Classify only known error tags;
 never infer categories by matching raw provider text. Missing or ambiguous
 references return status 3, malformed references return 2, and unclassified
 resolution failures return 20. Missing or contradictory SDK responses also fail
-closed. Empty successful values remain valid.
+closed. Empty successful values remain valid. Check cancellation before credential
+access, SDK initialization, and each resolution; stop further lookups if a
+resolver returns after timeout. When a result and the SDK deadline are both
+ready, check the deadline before accepting the result.
 
 Build the child environment deliberately. Never add the token, and remove known
 1Password authentication variables: OP_SERVICE_ACCOUNT_TOKEN, OP_CONNECT_TOKEN,

@@ -17,30 +17,43 @@ import (
 func TestSDKReferenceValidationOffline(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	done := make(chan error, 1)
+	// Local preflight intentionally does not implement the SDK query grammar.
+	// Track both outcomes so a dependency update cannot silently change the contract.
+	cases := []struct {
+		ref                  string
+		localValid, sdkValid bool
+	}{
+		{"op://vault/item/field", true, true},
+		{"op://Test Vault/Service Account Test/credential", true, true},
+		{"op://Test Vault/Service Account: Test/credential", false, false},
+		{"op://Test%20Vault/Service%20Account%3A%20Test/credential", false, false},
+		{"op://vault/item/field?attribute=otp", true, true},
+		{"op://vault/item/private_key?ssh-format=openssh", true, true},
+		{"op://vault/item/?attribute=otp", true, true},
+		{"op://   /item/field", true, true},
+		{"op://vault/\t/field", false, false},
+		{"op://vault/item/?", true, false},
+		{"op://vault/item/field?", true, false},
+		{"op://vault/item/field??", true, false},
+		{"op://vault/item/field?attribute=%20", true, false},
+		{"op://vault/item/field?attribute=unknown", true, false},
+		{"op://vault/item/field?unknown=value", true, false},
+	}
+	done := make(chan []bool, 1)
 	go func() {
-		for _, tc := range []struct {
-			ref   string
-			valid bool
-		}{
-			{"op://vault/item/field", true},
-			{"op://Test Vault/Service Account Test/credential", true},
-			{"op://Test Vault/Service Account: Test/credential", false},
-			{"op://Test%20Vault/Service%20Account%3A%20Test/credential", false},
-			{"op://vault/item/field?attribute=otp", true},
-		} {
-			err := onepassword.Secrets.ValidateSecretReference(ctx, tc.ref)
-			if (err == nil) != tc.valid {
-				done <- errors.New("SDK reference syntax disagrees with expected result")
-				return
-			}
+		results := make([]bool, len(cases))
+		for i, tc := range cases {
+			results[i] = onepassword.Secrets.ValidateSecretReference(ctx, tc.ref) == nil
 		}
-		done <- nil
+		done <- results
 	}()
 	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatal("SDK offline validation failed")
+	case results := <-done:
+		for i, tc := range cases {
+			_, err := parse(strings.NewReader("SECRET=" + tc.ref))
+			if (err == nil) != tc.localValid || results[i] != tc.sdkValid {
+				t.Errorf("reference %q: local valid=%t SDK valid=%t; expected %t/%t", tc.ref, err == nil, results[i], tc.localValid, tc.sdkValid)
+			}
 		}
 	case <-ctx.Done():
 		t.Fatal("SDK offline validation timed out")
@@ -68,6 +81,7 @@ func TestStructuredResolution(t *testing.T) {
 		{"value", map[string]response{ref: {Content: &onepassword.ResolvedReference{Secret: "fake-secret"}}}, "fake-secret", 0},
 		{"empty", map[string]response{ref: {Content: &onepassword.ResolvedReference{}}}, "", 0},
 		{"missing response", nil, "", 20},
+		{"extra reference", map[string]response{ref: {Content: &onepassword.ResolvedReference{Secret: "fake-secret"}}, "op://extra/item/field": {Content: &onepassword.ResolvedReference{Secret: "fake-other-secret"}}}, "", 20},
 		{"wrong reference", map[string]response{"op://other/item/field": {Content: &onepassword.ResolvedReference{Secret: "fake-secret"}}}, "", 20},
 		{"no outcome", map[string]response{ref: {}}, "", 20},
 		{"contradictory", map[string]response{ref: {Content: &onepassword.ResolvedReference{Secret: "fake-secret"}, Error: &onepassword.ResolveReferenceError{Type: onepassword.ResolveReferenceErrorTypeVariantFieldNotFound}}}, "", 20},

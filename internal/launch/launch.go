@@ -135,7 +135,7 @@ func unsupportedReferenceName(value string) string {
 			return "path"
 		}
 		for _, ch := range part {
-			if !(ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '_' || ch == '.' || ch == '-' || ch == ' ' || ch == '\t') {
+			if !(ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '_' || ch == '.' || ch == '-' || ch == ' ') {
 				return labels[i]
 			}
 		}
@@ -216,6 +216,9 @@ func (p *Prepared) run(ctx context.Context, credentials store.Store, timeout tim
 	if timeout <= 0 {
 		return &Error{2, "timeout must be positive"}
 	}
+	if ctx.Err() != nil {
+		return &Error{20, "operation canceled; command was not launched"}
+	}
 	values := make(map[string]string)
 	for _, kv := range p.inherited {
 		key, value, ok := strings.Cut(kv, "=")
@@ -241,6 +244,9 @@ func (p *Prepared) run(ctx context.Context, credentials store.Store, timeout tim
 		if token == "" || strings.ContainsAny(token, "\x00\r\n") {
 			return &Error{3, "credential store returned an invalid token"}
 		}
+		if ctx.Err() != nil {
+			return &Error{20, "operation canceled; command was not launched"}
+		}
 		networkCtx, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
 		// The SDK's initial WebAssembly compilation does not accept a context.
@@ -257,6 +263,10 @@ func (p *Prepared) run(ctx context.Context, credentials store.Store, timeout tim
 					done <- result{nil, &Error{20, "1Password SDK failed; command was not launched"}}
 				}
 			}()
+			if networkCtx.Err() != nil {
+				done <- result{nil, safeSDKError(networkCtx.Err(), 20, "operation canceled")}
+				return
+			}
 			r, err := create(networkCtx, token)
 			if err != nil {
 				done <- result{nil, safeSDKError(err, 10, "1Password authentication failed")}
@@ -265,6 +275,10 @@ func (p *Prepared) run(ctx context.Context, credentials store.Store, timeout tim
 			out := make(map[string]string)
 			cache := make(map[string]string)
 			for _, e := range p.entries {
+				if networkCtx.Err() != nil {
+					done <- result{nil, safeSDKError(networkCtx.Err(), 20, "operation canceled")}
+					return
+				}
 				if !e.reference {
 					continue
 				}
@@ -289,6 +303,10 @@ func (p *Prepared) run(ctx context.Context, credentials store.Store, timeout tim
 		case <-networkCtx.Done():
 			return &Error{20, "1Password operation timed out or was canceled; command was not launched"}
 		case result := <-done:
+			// Both channels may be ready. An expired deadline wins over a late result.
+			if networkCtx.Err() != nil {
+				return safeSDKError(networkCtx.Err(), 20, "operation canceled")
+			}
 			if result.err != nil {
 				return result.err
 			}

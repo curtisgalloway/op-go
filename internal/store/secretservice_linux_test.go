@@ -26,6 +26,7 @@ const fakeSession = dbus.ObjectPath("/org/freedesktop/secrets/session/test")
 type FakeSecretService struct {
 	conn            *dbus.Conn
 	loginAlias      bool
+	loginPath       dbus.ObjectPath
 	mu              sync.Mutex
 	calls           map[string]int
 	token           string
@@ -40,11 +41,14 @@ func (f *FakeSecretService) record(name string) { f.calls[name]++ }
 func (f *FakeSecretService) ReadAlias(alias string) (dbus.ObjectPath, *dbus.Error) {
 	f.mu.Lock()
 	f.record("ReadAlias")
-	delay, failure, loginAlias := f.delay, f.failure, f.loginAlias
+	delay, failure, loginAlias, loginPath := f.delay, f.failure, f.loginAlias, f.loginPath
 	f.mu.Unlock()
 	time.Sleep(delay)
 	if failure != "" {
 		return "/", dbus.NewError(failure, []any{"sentinel secret error"})
+	}
+	if alias == "login" && loginPath != "" {
+		return loginPath, nil
 	}
 	if alias != "default" && !(alias == "login" && loginAlias) {
 		return "/", nil

@@ -95,7 +95,9 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
   passed Linux checks for commit `737ef0c` but failed the new macOS reference
   preflight test. That test assumed `/bin/true`; it now uses its own executable
   and includes the actual error in failure diagnostics. Targeted Linux tests and
-  vet pass after the correction; native macOS confirmation is pending.
+  vet pass after the correction. Follow-up run
+  [38987885981](https://github.com/curtisgalloway/op-go/actions/runs/38987885981)
+  passed both native Linux and macOS checks for commit `9f760f6`.
 - Native macOS build, `go vet ./...`, and `go test -race ./...` passed.
 - GitHub Actions run [38979510614](https://github.com/curtisgalloway/op-go/actions/runs/38979510614)
   passed on native macOS and Linux for commit `0a09523`, including race tests,
@@ -126,6 +128,21 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
 - Built-CLI smoke checks passed with a dummy token: metadata and dry-run JSON,
   literal-environment command execution with exit 42, sanitized SDK rejection
   without command launch, and private-worker invocation refusal without pipes.
+- Follow-up launcher safety tests reproduced credential reads with an already
+  canceled context and additional lookups after a timed-out resolver returned
+  success. Explicit context checks now prevent both. The result-receive branch
+  also checks the SDK deadline so a simultaneous result cannot bypass expiry.
+  Fake-time tests cover stalled resolution, parent cancellation, and late success.
+  Additional regression cases cover token/NUL exposure guards, partial failure,
+  initialization error redaction, empty overrides, and duplicate-reference caching.
+- Structured SDK response tests reject an extra unrequested entry. A shared
+  offline grammar corpus records local and SDK validity, including deliberate
+  query-validation differences; tabs in names are now rejected locally to match
+  the SDK. Private D-Bus tests cover mismatched owners, missing/different login
+  aliases, and invalid passwords before a secret session opens. CLI tests verify
+  interactive run never unlocks and explicit wrong-password unlock never retries.
+  The expanded suite passed normal/race tests, vet, formatting, and a native
+  Linux build. Native macOS execution of these additions awaits CI.
 - The SDK's embedded WebAssembly reference validator ran successfully offline.
   Its initialization is slower with the race detector; the test allows 60 seconds.
   Normal runs retain the configurable 30-second SDK deadline.
