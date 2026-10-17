@@ -27,10 +27,15 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
   memory exception and passed with `allow-unsigned-executable-memory`, required
   by the SDK's current WebAssembly compiler. Normal tests and vet also passed.
   This is local signing validation, not notarization or completed upgrade
-  qualification. The existing enrollment still requires a one-time trust
-  migration: a targeted access update added the signed application but failed
-  authentication while updating the signing partition, which remains restricted
-  to the old hash. No token replacement was attempted.
+  qualification. A one-time trust migration added the signed application;
+  updating the signing partition through the API failed authentication even
+  after interactive approval. The user completed that targeted update with
+  Apple's `security` tool, preserving the old hash and adding the signing team.
+  The signed build then passed Keychain retrieval and reached SDK resolution.
+  The supplied reference returned status 20 with an unsupported SDK error
+  category, so this check establishes repaired credential access, not successful
+  live-secret delivery or the cause of the resolution failure. No token
+  replacement was attempted.
 - Native Linux amd64 checks passed with Go 1.26.9 on 2026-10-16: formatting,
   normal and race tests, vet, and build. The private D-Bus tests passed outside
   the agent sandbox; the sandbox prevented their bus from starting. These use
