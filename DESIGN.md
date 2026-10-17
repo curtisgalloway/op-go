@@ -83,7 +83,9 @@ Define a small environment-file grammar: blank lines, full-line comments,
 ASCII shell-style variable names, and KEY=value entries. No shell evaluation,
 variable expansion, multiline values, or embedded references. Values are literal;
 only a complete value beginning with op:// is resolved. Reject duplicate keys,
-NUL bytes, malformed lines, and reserved credential variables. For v1, quote characters, #, $, and backticks in values are literal, not syntax;
+NUL bytes, malformed lines, and reserved credential variables. Reject unsupported
+reference-name characters locally and direct the user to component IDs;
+percent-encoding does not escape unsupported names in the SDK grammar. For v1, quote characters, #, $, and backticks in values are literal, not syntax;
 only full-line comments are recognized. Preserve the value after the first =,
 except the line terminator. Reject export prefixes and whitespace around keys.
 Support one explicitly supplied environment file initially; its entries override

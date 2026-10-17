@@ -64,8 +64,13 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
   verifies nonempty live resolution, not nonempty delivery into a child
   environment. Both literal and percent-encoded title references for this
   item returned the structured parsing-error category; the exact-ID reference
-  succeeded. These parsing failures do not explain the earlier intermittent
-  failures for a different item.
+  succeeded. Offline reproduction and the provider documentation confirmed that
+  colons and percent-encoding are unsupported in reference names. Local parsing
+  now rejects those names with an ID-based correction before credential access.
+  Regression tests compare representative syntax with the embedded SDK validator
+  and preserve supported names with spaces and field query parameters. These
+  parsing failures do not explain the earlier intermittent failures for a
+  different item.
 - The SSH terminal workflow passed against an isolated GNOME Keyring 50.0:
   explicit `unlock`, enrollment's unlock offer, separate overwrite consent,
   hidden keyring-password and token input, exact token readback, and one

@@ -91,6 +91,11 @@ func parse(r io.Reader) ([]entry, error) {
 		if ref && !validReference(value) {
 			return bad()
 		}
+		if ref {
+			if component := unsupportedReferenceName(value); component != "" {
+				return nil, &Error{2, fmt.Sprintf("unsupported character in secret reference %s at line %d; use that component's ID instead of its name (percent-encoding is not supported)", component, line)}
+			}
+		}
 		result = append(result, entry{key, value, ref})
 		seen[key] = true
 	}
@@ -112,6 +117,30 @@ func validReference(value string) bool {
 		}
 	}
 	return true
+}
+
+// Reference names are not URL paths: percent-encoding is not supported by
+// 1Password. Query parameters belong to the field selector, not the field name.
+func unsupportedReferenceName(value string) string {
+	parts := strings.Split(strings.TrimPrefix(value, "op://"), "/")
+	labels := []string{"vault", "item", "field"}
+	if len(parts) == 4 {
+		labels = []string{"vault", "item", "section", "field"}
+	}
+	for i, part := range parts {
+		if i == len(parts)-1 {
+			part, _, _ = strings.Cut(part, "?")
+		}
+		if i >= len(labels) {
+			return "path"
+		}
+		for _, ch := range part {
+			if !(ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '_' || ch == '.' || ch == '-' || ch == ' ' || ch == '\t') {
+				return labels[i]
+			}
+		}
+	}
+	return ""
 }
 
 // Prepare parses without contacting a credential store or 1Password.

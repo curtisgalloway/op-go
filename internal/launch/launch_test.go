@@ -199,3 +199,40 @@ func TestSDKPanicIsSanitized(t *testing.T) {
 		t.Fatal("unsafe SDK panic handling")
 	}
 }
+
+func TestUnsupportedReferenceNamesFailDuringPrepare(t *testing.T) {
+	for _, tc := range []struct{ ref, component string }{
+		{"op://Test:Vault/Item/credential", "vault"},
+		{"op://Vault/Item?Title/credential", "item"},
+		{"op://Test Vault/Service Account: Test/credential", "item"},
+		{"op://Test%20Vault/Item/credential", "vault"},
+		{"op://Vault/Service%3A%20Test/credential", "item"},
+		{"op://Vault/Item/Section:Test/credential", "section"},
+		{"op://Vault/Item/Field:Test", "field"},
+	} {
+		t.Run(tc.component+tc.ref, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "test.env")
+			if err := os.WriteFile(path, []byte("SECRET="+tc.ref+"\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			prepared, err := Prepare(path, []string{"/bin/true"})
+			var failure *Error
+			if prepared != nil || !errors.As(err, &failure) || failure.Code != 2 || !strings.Contains(failure.Message, tc.component+" at line 1") || !strings.Contains(failure.Message, "ID") || strings.Contains(failure.Message, tc.ref) {
+				t.Fatal("missing actionable, sanitized preflight error")
+			}
+		})
+	}
+}
+
+func TestSupportedReferenceNamesAndQueries(t *testing.T) {
+	for _, ref := range []string{
+		"op://Test Vault/Service Account Test/credential",
+		"op://vault-id/item_id/Section Name/field.name",
+		"op://vault/item/field?attribute=otp",
+		"op://vault/item/private_key?ssh-format=openssh",
+	} {
+		if _, err := parse(strings.NewReader("SECRET=" + ref)); err != nil {
+			t.Fatalf("valid reference rejected: %v", err)
+		}
+	}
+}

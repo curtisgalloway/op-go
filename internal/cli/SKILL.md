@@ -68,6 +68,13 @@ backticks, and inline `#` have no special meaning. A complete value beginning wi
 keys, or `export` prefixes. Entries override inherited values. The executable is
 located using the original PATH before applying those overrides.
 
+Reference names support ASCII letters, digits, spaces, `_`, `.`, and `-`.
+For names containing other characters (for example, a colon in an item title),
+use that component's ID. Percent-encoding is not supported. `op-go` rejects
+unsupported name characters locally, before reading credentials. Names with
+spaces are written directly in the environment file without shell quotes.
+See [1Password reference syntax](https://www.1password.dev/cli/secret-reference-syntax).
+
 ## Output and exit status
 
 Management commands accept `--json` and emit one JSON document. Failures contain

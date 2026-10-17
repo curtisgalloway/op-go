@@ -117,6 +117,13 @@ with `remove --dry-run --json`. The fixed identity is service `op-go`, account
 
 ## Environment-file rules
 
+Reference names support ASCII letters, digits, spaces, `_`, `.`, and `-`.
+For names containing other characters (for example, a colon in an item title),
+use that component's ID. Percent-encoding is not supported. `op-go` rejects
+unsupported name characters locally, before reading credentials. Names with
+spaces are written directly in the environment file without shell quotes.
+See [1Password reference syntax](https://www.1password.dev/cli/secret-reference-syntax).
+
 - Exactly one `--env-file` is required for run and dry-run.
 - Names use ASCII letters, digits, and underscores; the first character cannot
   be a digit. No whitespace around names and no `export` prefix.

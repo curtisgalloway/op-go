@@ -18,7 +18,25 @@ func TestSDKReferenceValidationOffline(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	done := make(chan error, 1)
-	go func() { done <- onepassword.Secrets.ValidateSecretReference(ctx, "op://vault/item/field") }()
+	go func() {
+		for _, tc := range []struct {
+			ref   string
+			valid bool
+		}{
+			{"op://vault/item/field", true},
+			{"op://Test Vault/Service Account Test/credential", true},
+			{"op://Test Vault/Service Account: Test/credential", false},
+			{"op://Test%20Vault/Service%20Account%3A%20Test/credential", false},
+			{"op://vault/item/field?attribute=otp", true},
+		} {
+			err := onepassword.Secrets.ValidateSecretReference(ctx, tc.ref)
+			if (err == nil) != tc.valid {
+				done <- errors.New("SDK reference syntax disagrees with expected result")
+				return
+			}
+		}
+		done <- nil
+	}()
 	select {
 	case err := <-done:
 		if err != nil {

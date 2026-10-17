@@ -55,7 +55,7 @@ func classifySDKError(err error, code int, message string) error {
 	if errors.As(err, &reference) {
 		switch reference.kind {
 		case onepassword.ResolveReferenceErrorTypeVariantParsing:
-			return &Error{2, "secret reference syntax is invalid"}
+			return &Error{2, "secret reference syntax is invalid; use IDs for names containing unsupported characters"}
 		case onepassword.ResolveReferenceErrorTypeVariantVaultNotFound:
 			return &Error{3, "secret reference vault not found or unavailable"}
 		case onepassword.ResolveReferenceErrorTypeVariantItemNotFound:
