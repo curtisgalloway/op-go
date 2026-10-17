@@ -91,6 +91,11 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
   compatibility with other GNOME Keyring versions remains unqualified.
   The actual desktop keyring also passed unlock preflight and reached the hidden
   password prompt; it was canceled before password input, with echo restored.
+- GitHub Actions run [38986511016](https://github.com/curtisgalloway/op-go/actions/runs/38986511016)
+  passed Linux checks for commit `737ef0c` but failed the new macOS reference
+  preflight test. That test assumed `/bin/true`; it now uses its own executable
+  and includes the actual error in failure diagnostics. Targeted Linux tests and
+  vet pass after the correction; native macOS confirmation is pending.
 - Native macOS build, `go vet ./...`, and `go test -race ./...` passed.
 - GitHub Actions run [38979510614](https://github.com/curtisgalloway/op-go/actions/runs/38979510614)
   passed on native macOS and Linux for commit `0a09523`, including race tests,

@@ -201,6 +201,10 @@ func TestSDKPanicIsSanitized(t *testing.T) {
 }
 
 func TestUnsupportedReferenceNamesFailDuringPrepare(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tc := range []struct{ ref, component string }{
 		{"op://Test:Vault/Item/credential", "vault"},
 		{"op://Vault/Item?Title/credential", "item"},
@@ -215,10 +219,10 @@ func TestUnsupportedReferenceNamesFailDuringPrepare(t *testing.T) {
 			if err := os.WriteFile(path, []byte("SECRET="+tc.ref+"\n"), 0600); err != nil {
 				t.Fatal(err)
 			}
-			prepared, err := Prepare(path, []string{"/bin/true"})
+			prepared, err := Prepare(path, []string{executable})
 			var failure *Error
 			if prepared != nil || !errors.As(err, &failure) || failure.Code != 2 || !strings.Contains(failure.Message, tc.component+" at line 1") || !strings.Contains(failure.Message, "ID") || strings.Contains(failure.Message, tc.ref) {
-				t.Fatal("missing actionable, sanitized preflight error")
+				t.Fatalf("missing actionable, sanitized preflight error: %v", err)
 			}
 		})
 	}
