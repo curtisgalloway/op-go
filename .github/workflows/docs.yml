@@ -1,0 +1,72 @@
+# SPDX-FileCopyrightText: 2026 Curtis Galloway
+# SPDX-License-Identifier: Apache-2.0
+name: Publish apt repository
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 6 * * 1'
+  push:
+    branches: [main]
+    paths: ['packaging/scripts/build-apt-repo.sh', '.github/workflows/docs.yml']
+permissions:
+  contents: read
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.repository == 'curtisgalloway/op-go'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update -qq && sudo apt-get install -y dpkg-dev apt-utils gnupg
+      - name: Rebuild signed pool from the latest five stable releases
+        env:
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          GNUPGHOME: ${{ runner.temp }}/op-go-apt-keys
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${APT_SIGNING_KEY:?Missing key; refusing to deploy an incomplete apt site}"
+          mkdir -m 700 "$GNUPGHOME"
+          mkdir -p build/debs _site
+          gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --exclude-pre-releases --limit 5 --json tagName --jq '.[].tagName' > build/tags
+          test -s build/tags
+          while IFS= read -r tag; do
+            gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir build/debs --pattern '*.deb' --pattern '*.deb.sha256'
+          done < build/tags
+          (cd build/debs && sha256sum -c ./*.deb.sha256)
+          printf '%s' "$APT_SIGNING_KEY" | gpg --batch --import
+          gpg --batch --list-secret-keys --with-colons > build/key-list
+          python3 - <<'PY'
+          import pathlib
+          lines = pathlib.Path('build/key-list').read_text().splitlines()
+          if sum(line.startswith('sec:') for line in lines) != 1:
+              raise SystemExit('Exactly one apt signing key is required')
+          fingerprint = next(line.split(':')[9] for line in lines if line.startswith('fpr:'))
+          pathlib.Path('build/fingerprint').write_text(fingerprint + '\n')
+          PY
+          read -r fingerprint < build/fingerprint
+          bash packaging/scripts/build-apt-repo.sh build/debs _site/apt "$fingerprint"
+          printf '%s\n' '<!doctype html><title>op-go</title><a href="apt/">Signed apt repository</a>' > _site/index.html
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
+      - name: Remove imported apt key
+        if: always()
+        env:
+          GNUPGHOME: ${{ runner.temp }}/op-go-apt-keys
+        run: gpgconf --kill all || true
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346

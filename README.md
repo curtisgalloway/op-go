@@ -12,6 +12,45 @@ explicit read-only token file for headless use. It is not an official 1Password
 product. This is a development implementation, not a released security product;
 see [validation status](VALIDATION.md) for the checks and remaining limits.
 
+## Release installation
+
+The [release process](RELEASING.md) builds macOS universal and Linux amd64/arm64
+packages and checks them using the [release-train profile](RELEASE-TRAIN.md).
+These channels become available after the first approved release; there is no
+published release or installable tap formula yet.
+
+Homebrew (macOS and Linux) installs the tested binary without compiling Go:
+
+```sh
+brew install curtisgalloway/tap/op-go
+brew test curtisgalloway/tap/op-go
+```
+
+Use `brew update` and `brew upgrade op-go` for subsequent releases. The tap
+updates automatically after verifying every release archive and checksum.
+
+Debian and Ubuntu use the signed apt repository. After the first release,
+compare the public key's fingerprint with the repository page, then install:
+
+```sh
+sudo install -d /etc/apt/keyrings
+sudo curl -fsSL -o /etc/apt/keyrings/op-go.asc https://curtisgalloway.github.io/op-go/apt/op-go.asc
+sudo tee /etc/apt/sources.list.d/op-go.sources >/dev/null <<'EOF'
+Types: deb
+URIs: https://curtisgalloway.github.io/op-go/apt
+Suites: stable
+Components: main
+Signed-By: /etc/apt/keyrings/op-go.asc
+EOF
+sudo apt update
+sudo apt install op-go
+```
+
+Subsequent `apt upgrade` runs receive new versions. Release archives and a
+signed, notarized macOS disk image will also be available from GitHub Releases,
+each with a checksum sidecar (a file containing its SHA-256 digest). See the
+[glossary](GLOSSARY.md) for package terminology.
+
 ## Build
 
 Requires Go 1.26.9 or newer. macOS Keychain support also requires Apple's command-line

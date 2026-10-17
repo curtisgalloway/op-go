@@ -1,0 +1,336 @@
+# SPDX-FileCopyrightText: 2026 Curtis Galloway
+# SPDX-License-Identifier: Apache-2.0
+name: Release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Dry-run version X.Y.Z (no GitHub release or channel updates)'
+        required: true
+        default: '0.1.0'
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+defaults:
+  run:
+    shell: bash
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+      commit: ${{ steps.metadata.outputs.commit }}
+      date: ${{ steps.metadata.outputs.date }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate release source and metadata
+        id: metadata
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          EVENT: ${{ github.event_name }}
+          RELEASE_QUALIFIED: ${{ vars.RELEASE_QUALIFIED }}
+        run: |
+          git merge-base --is-ancestor HEAD origin/main
+          python3 - <<'PY'
+          import datetime, os, re, subprocess
+          tag = os.environ['GITHUB_REF_NAME']
+          version = tag.removeprefix('v') if os.environ['EVENT'] == 'push' else os.environ['INPUT_VERSION']
+          if not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version):
+              raise SystemExit('Version must be X.Y.Z')
+          if os.environ['EVENT'] == 'push' and tag != 'v' + version:
+              raise SystemExit('Release tag must be vX.Y.Z')
+          if os.environ['EVENT'] == 'push' and os.environ['RELEASE_QUALIFIED'] != 'true':
+              raise SystemExit('Complete RELEASE-TRAIN.md qualification before enabling publication')
+          commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          epoch = int(subprocess.check_output(['git', 'show', '-s', '--format=%ct', 'HEAD'], text=True))
+          date = datetime.datetime.fromtimestamp(epoch, datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
+              out.write(f'version={version}\ncommit={commit}\ndate={date}\n')
+          PY
+  linux:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    env:
+      OP_GO_VERSION: ${{ needs.prepare.outputs.version }}
+      OP_GO_COMMIT: ${{ needs.prepare.outputs.commit }}
+      OP_GO_DATE: ${{ needs.prepare.outputs.date }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+      - run: sudo apt-get update -qq && sudo apt-get install -y dbus dpkg-dev apt-utils
+      - run: go test -race ./... && go vet ./...
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - name: Build and package
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          bash scripts/build-linux.sh "$ARCH" build/op-go
+          bash packaging/scripts/package.sh "$OP_GO_VERSION" "linux-$ARCH" build/op-go dist
+          mkdir -p build/unpacked
+          tar -xzf "dist/op-go-v$OP_GO_VERSION-linux-$ARCH.tar.gz" -C build/unpacked
+          python3 scripts/smoke-release.py "build/unpacked/op-go-$OP_GO_VERSION/op-go" "$OP_GO_VERSION"
+          sudo dpkg -i "dist/op-go_${OP_GO_VERSION}_${ARCH}.deb"
+          python3 scripts/smoke-release.py /usr/bin/op-go "$OP_GO_VERSION"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: linux-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
+  macos:
+    needs: prepare
+    runs-on: macos-15
+    environment: release
+    timeout-minutes: 45
+    env:
+      OP_GO_VERSION: ${{ needs.prepare.outputs.version }}
+      OP_GO_COMMIT: ${{ needs.prepare.outputs.commit }}
+      OP_GO_DATE: ${{ needs.prepare.outputs.date }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+      - run: go test -race ./... && go vet ./...
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - name: Import signing material into temporary keychain
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          MACOS_NOTARY_API_KEY_P8: ${{ secrets.MACOS_NOTARY_API_KEY_P8 }}
+        run: |
+          : "${MACOS_CERT_P12:?Missing Developer ID certificate}"
+          : "${MACOS_CERT_PASSWORD:?Missing certificate export password}"
+          : "${MACOS_NOTARY_API_KEY_P8:?Missing project notarization key}"
+          umask 077
+          python3 - <<'PY'
+          import base64, os, pathlib, secrets
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          (root / 'cert.p12').write_bytes(base64.b64decode(os.environ['MACOS_CERT_P12'], validate=True))
+          (root / 'notary.p8').write_bytes(base64.b64decode(os.environ['MACOS_NOTARY_API_KEY_P8'], validate=True))
+          (root / 'keychain-password').write_text(secrets.token_hex(32), encoding='utf-8')
+          PY
+          read -r keychain_password < "$RUNNER_TEMP/keychain-password" || true
+          echo "::add-mask::$keychain_password"
+          security create-keychain -p "$keychain_password" "$RUNNER_TEMP/signing.keychain-db"
+          security set-keychain-settings -lut 21600 "$RUNNER_TEMP/signing.keychain-db"
+          security unlock-keychain -p "$keychain_password" "$RUNNER_TEMP/signing.keychain-db"
+          security import "$RUNNER_TEMP/cert.p12" -k "$RUNNER_TEMP/signing.keychain-db" -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$RUNNER_TEMP/signing.keychain-db" >/dev/null
+          security list-keychains -d user -s "$RUNNER_TEMP/signing.keychain-db" login.keychain-db
+          rm -f "$RUNNER_TEMP/cert.p12" "$RUNNER_TEMP/keychain-password"
+      - name: Build universal signed CLI and Intel SDK test
+        env:
+          MACOS_UNIVERSAL: '1'
+        run: |
+          bash scripts/build-macos.sh
+          mkdir -p build/release-tests
+          CGO_ENABLED=1 GOARCH=amd64 go test -trimpath -c -o build/release-tests/sdk-amd64.test ./internal/launch
+          codesign --force --sign 'Developer ID Application' --identifier com.github.curtisgalloway.op-go.tests --options runtime --timestamp --entitlements scripts/macos-entitlements.plist build/release-tests/sdk-amd64.test
+      - name: Notarize and package
+        env:
+          MACOS_NOTARY_KEY_FILE: ${{ runner.temp }}/notary.p8
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+        run: |
+          bash scripts/notarize-macos.sh bin/op-go "$OP_GO_VERSION" dist
+          bash packaging/scripts/package.sh "$OP_GO_VERSION" darwin-universal bin/op-go dist
+          shasum -a 256 "dist/op-go-v$OP_GO_VERSION-darwin-universal.dmg" > "dist/op-go-v$OP_GO_VERSION-darwin-universal.dmg.sha256"
+          python3 - <<'PY'
+          import os, pathlib
+          p = pathlib.Path('dist') / ('op-go-v' + os.environ['OP_GO_VERSION'] + '-darwin-universal.dmg.sha256')
+          digest, name = p.read_text().strip().split(None, 1)
+          p.write_text(digest + '  ' + pathlib.Path(name).name + '\n')
+          PY
+          mkdir -p build/unpacked
+          tar -xzf "dist/op-go-v$OP_GO_VERSION-darwin-universal.tar.gz" -C build/unpacked
+          python3 scripts/smoke-release.py "build/unpacked/op-go-$OP_GO_VERSION/op-go" "$OP_GO_VERSION"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: macos
+          path: dist/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: intel-sdk-test
+          path: build/release-tests/sdk-amd64.test
+      - name: Remove temporary signing material
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+          rm -f "$RUNNER_TEMP/cert.p12" "$RUNNER_TEMP/notary.p8" "$RUNNER_TEMP/keychain-password"
+  homebrew:
+    needs: [prepare, linux, macos]
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel, ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      HOMEBREW_NO_INSTALL_CLEANUP: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: curtisgalloway/homebrew-tap
+          ref: 6c2d0ff2e1936740b1c5d375d1ccb4f7899155b5
+          path: build/tap-source
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: linux-*
+          merge-multiple: true
+          path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: macos
+          path: dist
+      - uses: Homebrew/actions/setup-homebrew@4790763c0a3ba4036f72634dc079c4a7dfcd4878
+      - name: Install the actual bottle into the disposable runner
+        run: |
+          python3 build/tap-source/scripts/repin_op_go.py --tag "v$VERSION" --assets dist --output build/op-go.rb
+          python3 - <<'PY'
+          import os, pathlib
+          path = pathlib.Path('build/op-go.rb')
+          base = 'https://github.com/curtisgalloway/op-go/releases/download/v' + os.environ['VERSION']
+          path.write_text(path.read_text().replace(base, pathlib.Path('dist').resolve().as_uri()))
+          PY
+          GIT_AUTHOR_NAME=release-test GIT_AUTHOR_EMAIL=test@example.invalid GIT_COMMITTER_NAME=release-test GIT_COMMITTER_EMAIL=test@example.invalid brew tap-new op-go-release/test
+          brew --repository op-go-release/test > build/tap-path
+          read -r tap_path < build/tap-path
+          cp build/op-go.rb "$tap_path/Formula/op-go.rb"
+          brew install --force-bottle op-go-release/test/op-go
+          brew test op-go-release/test/op-go
+          brew --prefix op-go > build/keg-path
+          read -r keg_path < build/keg-path
+          python3 scripts/smoke-release.py "$keg_path/bin/op-go" "$VERSION"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        if: matrix.runner == 'macos-15-intel'
+        with:
+          name: intel-sdk-test
+          path: build/sdk-test
+      - name: Execute signed Intel SDK offline
+        if: matrix.runner == 'macos-15-intel'
+        run: |
+          chmod +x build/sdk-test/sdk-amd64.test
+          codesign --verify --strict build/sdk-test/sdk-amd64.test
+          build/sdk-test/sdk-amd64.test -test.run '^TestSDKReferenceValidationOffline$'
+  apt-install:
+    needs: [prepare, linux]
+    strategy:
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: linux-*
+          merge-multiple: true
+          path: dist
+      - run: sudo apt-get update -qq && sudo apt-get install -y dpkg-dev apt-utils gnupg
+      - env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: bash packaging/scripts/test-apt.sh dist "$VERSION"
+  publish:
+    if: github.event_name == 'push'
+    needs: [prepare, linux, macos, homebrew, apt-install]
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: linux-*
+          merge-multiple: true
+          path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: macos
+          path: dist
+      - name: Publish verified assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes dist/*.tar.gz dist/*.deb dist/*.dmg dist/*.sha256
+  update-channels:
+    if: github.event_name == 'push'
+    needs: [publish, prepare]
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Update Homebrew tap
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_DISPATCH_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          : "${GH_TOKEN:?HOMEBREW_TAP_DISPATCH_TOKEN is required}"
+          gh api --method POST repos/curtisgalloway/homebrew-tap/dispatches -f event_type=op-go-release -f "client_payload[tag]=$TAG"
+      - name: Rebuild signed apt repository
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run docs.yml --repo "$GITHUB_REPOSITORY" --ref main
+  verify-published:
+    if: github.event_name == 'push'
+    needs: [publish, prepare]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: darwin-universal
+          - runner: macos-15-intel
+            target: darwin-universal
+          - runner: ubuntu-24.04
+            target: linux-amd64
+          - runner: ubuntu-24.04-arm
+            target: linux-arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Download and run the published archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          mkdir -p build/published
+          asset="op-go-v$VERSION-$TARGET.tar.gz"
+          gh release download "v$VERSION" --repo "$GITHUB_REPOSITORY" --dir build/published --pattern "$asset" --pattern "$asset.sha256"
+          (cd build/published && shasum -a 256 -c "$asset.sha256" && tar -xzf "$asset")
+          python3 scripts/smoke-release.py "build/published/op-go-$VERSION/op-go" "$VERSION"

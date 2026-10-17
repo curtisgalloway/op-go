@@ -11,6 +11,19 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
 
 ## Observed checks
 
+- The release infrastructure was exercised locally with disposable candidates:
+  a Developer ID-signed universal macOS binary passed signature verification,
+  the signed offline SDK validator and the CLI smoke contract. Both Linux
+  architectures built with cgo disabled and passed the smoke contract in
+  disposable containers; amd64 ran under Rosetta translation. Both packages
+  passed authenticated apt download and actual dpkg installation into temporary
+  roots. Packaging tests verified archive contents, signatures/checksums,
+  Debian metadata, retained versions and 30-day signed index expiry. A real
+  Homebrew 7.0.9 Linux amd64 bottle pour, brew test and installed-CLI smoke check
+  passed in a disposable container. These candidates were not published.
+  Native Intel macOS execution, the complete four-runner Homebrew matrix,
+  Apple notarization, the published apt site and automated tap dispatch remain
+  unverified until credentials are provisioned and the release dry run passes.
 - Native macOS 27.0.1 arm64 checks with Go 1.27.2 passed for `9b8ebf6`:
   normal and race tests, formatting, vet, build, and the pinned vulnerability
   scan. CLI smoke checks passed for JSON output, literal environment delivery,

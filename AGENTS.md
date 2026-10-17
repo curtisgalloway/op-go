@@ -28,6 +28,11 @@ Credential access is implemented. Read VALIDATION.md before claiming release rea
   back to ad hoc signing. Unsigned builds in disposable CI jobs are fine for
   fake-credential tests, but do not qualify Keychain access or release signing.
   On Linux, use `go build -o bin/op-go ./cmd/op-go`.
+- Use `RELEASE-TRAIN.md` for release work. A tag is not authorization to bypass
+  packaging, signing, notarization, install checks, or the explicit publish gate.
+- There is standing approval to start and use Apple's container service for
+  isolated Linux build and release-package validation. Use disposable containers
+  and test prefixes; do not modify the user's installed software.
 - Keep --skill embedded and synchronized with actual supported behavior.
 - Launcher statuses: 0 success, 2 usage, 3 missing precondition, 10 authentication,
   11 unlock needed, 12 denied, 20 failed read/timeout, 22 unknown mutation outcome,

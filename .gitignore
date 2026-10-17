@@ -4,3 +4,9 @@
 .env.*
 !.env.example
 .DS_Store
+/dist/
+/build/
+/release-logs/
+/RELEASE-TRAIN.local.md
+__pycache__/
+*.pyc
