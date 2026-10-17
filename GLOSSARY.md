@@ -6,6 +6,9 @@
 - **Secret reference:** An `op://vault/item/field` identifier, not the secret itself.
 - **SDK:** A software development kit; here, the official Go library for 1Password.
 - **Keychain:** The macOS credential storage service.
+- **Developer ID:** An Apple-issued signing identity for software distributed outside the App Store.
+- **Hardened runtime:** macOS process protections enabled when signing an executable.
+- **Notarization:** Apple's separate check of a signed distribution for malicious software.
 - **Secret Service:** The Linux desktop protocol for storing credentials through a session service.
 - **GNOME Keyring:** A Linux credential-store implementation of Secret Service. Its login keyring is an encrypted collection normally unlocked during desktop login.
 - **SSH:** Secure Shell, used to open a terminal session on another machine. SSH login does not necessarily unlock a desktop keyring.

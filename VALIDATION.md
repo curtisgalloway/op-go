@@ -11,6 +11,26 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
 
 ## Observed checks
 
+- Native macOS 27.0.1 arm64 checks with Go 1.27.2 passed for `9b8ebf6`:
+  normal and race tests, formatting, vet, build, and the pinned vulnerability
+  scan. CLI smoke checks passed for JSON output, literal environment delivery,
+  authentication-variable filtering, exact exit/signal preservation, and invalid
+  reference rejection. The tests require an environment without an inherited
+  service-account token; one interactive-run test otherwise exercises the
+  inherited-token refusal before reaching its fake locked store.
+- A rebuilt ad hoc binary could read enrollment metadata but was denied token
+  access. Inspection found the enrollment restricted to the previous binary's
+  signing hash. The macOS build script now uses Developer ID signing, a stable
+  identifier, hardened runtime, and a secure timestamp. It verifies the signature
+  and executes the offline SDK validator in a similarly signed test binary
+  before replacing the CLI. That validator was terminated without an executable
+  memory exception and passed with `allow-unsigned-executable-memory`, required
+  by the SDK's current WebAssembly compiler. Normal tests and vet also passed.
+  This is local signing validation, not notarization or completed upgrade
+  qualification. The existing enrollment still requires a one-time trust
+  migration: a targeted access update added the signed application but failed
+  authentication while updating the signing partition, which remains restricted
+  to the old hash. No token replacement was attempted.
 - Native Linux amd64 checks passed with Go 1.26.9 on 2026-10-16: formatting,
   normal and race tests, vet, and build. The private D-Bus tests passed outside
   the agent sandbox; the sandbox prevented their bus from starting. These use
