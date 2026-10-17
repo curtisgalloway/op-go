@@ -57,6 +57,15 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
   and refusal to retry or launch after failures. Two authorized live checks
   through the changed API confirmed delivery of the existing empty field and
   status 3 with a field-not-found diagnostic for the nonexistent password field.
+- An additional authorized Linux check resolved a nonempty credential using
+  user-supplied vault and item IDs through the structured SDK API. Because the
+  target value was itself a service-account token, it stayed in memory: no
+  child was launched and no value, length, or fingerprint was printed. This
+  verifies nonempty live resolution, not nonempty delivery into a child
+  environment. Both literal and percent-encoded title references for this
+  item returned the structured parsing-error category; the exact-ID reference
+  succeeded. These parsing failures do not explain the earlier intermittent
+  failures for a different item.
 - The SSH terminal workflow passed against an isolated GNOME Keyring 50.0:
   explicit `unlock`, enrollment's unlock offer, separate overwrite consent,
   hidden keyring-password and token input, exact token readback, and one
