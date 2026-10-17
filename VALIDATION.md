@@ -71,6 +71,14 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
   and preserve supported names with spaces and field query parameters. These
   parsing failures do not explain the earlier intermittent failures for a
   different item.
+- An authorized Linux end-to-end check resolved a nonempty application secret
+  through exact vault/item IDs and the user-specified custom field name. The
+  rebuilt CLI retrieved its enrolled token from Secret Service and replaced
+  itself with a child that verified a nonempty application variable and absence
+  of `OP_SERVICE_ACCOUNT_TOKEN`, `OP_CONNECT_TOKEN`, and all `OP_SESSION_`
+  variables. The child returned status 0. Only pass/fail was printed; no secret
+  value, length, or fingerprint was recorded. This completes the Linux nonempty
+  live-secret delivery check, without resolving the earlier lookup intermittency.
 - The SSH terminal workflow passed against an isolated GNOME Keyring 50.0:
   explicit `unlock`, enrollment's unlock offer, separate overwrite consent,
   hidden keyring-password and token input, exact token readback, and one
