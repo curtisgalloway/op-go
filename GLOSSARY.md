@@ -9,6 +9,15 @@
 - **Developer ID:** An Apple-issued signing identity for software distributed outside the App Store.
 - **Hardened runtime:** macOS process protections enabled when signing an executable.
 - **Notarization:** Apple's separate check of a signed distribution for malicious software.
+- **Homebrew tap:** A Git repository of installation recipes for the Homebrew package manager.
+- **Homebrew formula:** The recipe selecting, installing and testing a package.
+- **Homebrew bottle:** A prebuilt package installed without compiling from source.
+- **Universal binary:** One macOS executable containing both Apple silicon and Intel code.
+- **Debian package:** A `.deb` archive with software and metadata for Debian-family systems.
+- **apt repository:** Signed package indexes and downloads that support Debian installation and upgrades.
+- **Checksum sidecar:** A small file beside an archive containing its SHA-256 digest for integrity verification.
+- **GitHub environment:** A named set of deployment secrets and approval rules for Actions jobs.
+- **Release candidate:** A specific build being validated before publication.
 - **Secret Service:** The Linux desktop protocol for storing credentials through a session service.
 - **GNOME Keyring:** A Linux credential-store implementation of Secret Service. Its login keyring is an encrypted collection normally unlocked during desktop login.
 - **SSH:** Secure Shell, used to open a terminal session on another machine. SSH login does not necessarily unlock a desktop keyring.

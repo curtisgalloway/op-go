@@ -37,3 +37,26 @@ jobs:
           set -e
           test "$result" -eq 3
           python3 -c 'import json; assert json.load(open("doctor.json"))["ok"] is False'
+  release-infrastructure:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+      - run: sudo apt-get update -qq && sudo apt-get install -y dpkg-dev apt-utils gnupg shellcheck
+      - run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+      - run: shellcheck scripts/*.sh packaging/scripts/*.sh
+      - run: python3 -m unittest discover -s scripts/tests -v
+      - name: Package and install through disposable signed apt repository
+        env:
+          OP_GO_VERSION: '0.0.0'
+          OP_GO_COMMIT: ${{ github.sha }}
+          OP_GO_DATE: '1970-01-01T00:00:00Z'
+        run: |
+          for arch in amd64 arm64; do
+            bash scripts/build-linux.sh "$arch" "build/op-go-$arch"
+            bash packaging/scripts/package.sh "$OP_GO_VERSION" "linux-$arch" "build/op-go-$arch" dist
+          done
+          bash packaging/scripts/test-apt.sh dist "$OP_GO_VERSION"
+      - run: python3 scripts/check-release-profile.py RELEASE-TRAIN.md
