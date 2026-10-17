@@ -5,7 +5,7 @@ system libraries. D-Bus is the local messaging protocol used by Linux Secret
 Service. See [GLOSSARY.md](GLOSSARY.md).
 
 This development implementation has automated evidence for its command and
-credential-transport behavior and a macOS real-account smoke check. It has not
+credential-transport behavior and macOS and Linux real-account smoke checks. It has not
 completed signed-release qualification. A green suite does not prove Keychain
 access after a binary upgrade or behavior of every Linux desktop keyring.
 
@@ -30,8 +30,25 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
   this failed launch found no dummy-token sentinel in sampled process arguments
   or environments. Sampling is not exhaustive and does not establish successful
   real-account launch behavior. The existing desktop keyring was locked; its
-  metadata check returned status 11. It was not unlocked or modified, and no
-  real-account Linux check has completed.
+  metadata check returned status 11. That isolated-store validation did not
+  unlock or modify the desktop keyring.
+- After user-operated enrollment, an authorized Linux real-account check on
+  2026-10-16 retrieved the token from the desktop keyring and resolved an existing
+  application item's credential field. The child verified that the variable was
+  present and authentication variables were absent. Direct item retrieval
+  confirmed that this field's stored value was empty; this does not validate
+  nonempty live-secret delivery. The initially requested password field did not
+  exist on that item. No secret values were printed.
+- Earlier Linux name-based resolutions intermittently failed with generic
+  status 3. A bounded diagnostic subsequently succeeded with all four vault/item
+  name/ID combinations using both shared and fresh SDK clients (eight reads),
+  plus separate cold processes using all names and all IDs (two reads). Every
+  result matched the empty field confirmed by direct item retrieval. These
+  checks did not reproduce or explain the intermittent failures. Unrecognized
+  SDK resolution errors currently collapse to status 3, so this status alone
+  cannot distinguish a missing reference from an operational or authentication
+  failure. A future reproduction needs sanitized error-type/category evidence;
+  the successful checks do not establish that IDs eliminate the failure.
 - The SSH terminal workflow passed against an isolated GNOME Keyring 50.0:
   explicit `unlock`, enrollment's unlock offer, separate overwrite consent,
   hidden keyring-password and token input, exact token readback, and one
