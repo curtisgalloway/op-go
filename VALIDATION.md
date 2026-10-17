@@ -11,6 +11,31 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
 
 ## Observed checks
 
+- Native macOS 27.0.1 arm64 checks with Go 1.27.2 passed for `9b8ebf6`:
+  normal and race tests, formatting, vet, build, and the pinned vulnerability
+  scan. CLI smoke checks passed for JSON output, literal environment delivery,
+  authentication-variable filtering, exact exit/signal preservation, and invalid
+  reference rejection. The tests require an environment without an inherited
+  service-account token; one interactive-run test otherwise exercises the
+  inherited-token refusal before reaching its fake locked store.
+- A rebuilt ad hoc binary could read enrollment metadata but was denied token
+  access. Inspection found the enrollment restricted to the previous binary's
+  signing hash. The macOS build script now uses Developer ID signing, a stable
+  identifier, hardened runtime, and a secure timestamp. It verifies the signature
+  and executes the offline SDK validator in a similarly signed test binary
+  before replacing the CLI. That validator was terminated without an executable
+  memory exception and passed with `allow-unsigned-executable-memory`, required
+  by the SDK's current WebAssembly compiler. Normal tests and vet also passed.
+  This is local signing validation, not notarization or completed upgrade
+  qualification. A one-time trust migration added the signed application;
+  updating the signing partition through the API failed authentication even
+  after interactive approval. The user completed that targeted update with
+  Apple's `security` tool, preserving the old hash and adding the signing team.
+  The signed build then passed Keychain retrieval and reached SDK resolution.
+  The supplied reference returned status 20 with an unsupported SDK error
+  category, so this check establishes repaired credential access, not successful
+  live-secret delivery or the cause of the resolution failure. No token
+  replacement was attempted.
 - Native Linux amd64 checks passed with Go 1.26.9 on 2026-10-16: formatting,
   normal and race tests, vet, and build. The private D-Bus tests passed outside
   the agent sandbox; the sandbox prevented their bus from starting. These use

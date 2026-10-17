@@ -19,9 +19,32 @@ developer tools and cgo (enabled by default for native Go builds). From the
 repository root:
 
 ```sh
-go build -o bin/op-go ./cmd/op-go
+bash scripts/build-macos.sh
 ./bin/op-go --help
 ```
+
+The macOS script requires a Developer ID signing identity (an Apple-issued
+certificate and its private key) in your Keychain. It signs with a stable
+application identifier, enables the hardened runtime (macOS process protections),
+adds a secure timestamp, and verifies the signature before replacing `bin/op-go`.
+It also runs the offline SDK validator under the same signing protections.
+The SDK compiles WebAssembly into executable memory, so the signature includes
+Apple's `allow-unsigned-executable-memory` exception; without it, macOS terminates
+the SDK. Other hardened-runtime protections remain enabled.
+If multiple identities match, set `MACOS_SIGNING_IDENTITY` to the intended
+certificate's fingerprint. Use the same signing identity for subsequent builds.
+This local build is not notarized; notarization is Apple's separate distribution
+check and remains required before publishing macOS releases.
+
+Enroll with the signed build. Plain `go build` produces an ad hoc signature
+whose identity changes with the executable, so an enrollment made by that build
+can reject its replacement. Signing a new build does not automatically migrate
+an existing enrollment's access rules. A one-time Keychain authorization update
+is required; do not delete or replace the stored token just to change binary trust.
+
+For Linux builds or unsigned development checks, use
+`go build -o bin/op-go ./cmd/op-go`. On macOS, this overwrites any signed build;
+run the signing script again before using an enrollment tied to its identity.
 
 Linux service-account builds can use `CGO_ENABLED=0`. The pinned 1Password SDK
 embeds its WebAssembly runtime. A macOS build without cgo can use a token file,
