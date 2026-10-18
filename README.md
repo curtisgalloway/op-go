@@ -29,12 +29,20 @@ brew test curtisgalloway/tap/op-go
 Use `brew update` and `brew upgrade op-go` for subsequent releases. The tap
 updates automatically after verifying every release archive and checksum.
 
-Debian and Ubuntu use the signed apt repository. After the first release,
-compare the public key's fingerprint with the repository page, then install:
+Debian and Ubuntu use the signed apt repository, available after the first
+release. Its signing key's fingerprint is:
+
+```text
+B845 C0DD 6090 B15E 11E6  41FC 6A31 19CB 3C2E F629
+```
+
+Install the key, check that `gpg --show-keys` prints that fingerprint, then add
+the repository:
 
 ```sh
 sudo install -d /etc/apt/keyrings
 sudo curl -fsSL -o /etc/apt/keyrings/op-go.asc https://curtisgalloway.github.io/op-go/apt/op-go.asc
+gpg --show-keys /etc/apt/keyrings/op-go.asc
 sudo tee /etc/apt/sources.list.d/op-go.sources >/dev/null <<'EOF'
 Types: deb
 URIs: https://curtisgalloway.github.io/op-go/apt
