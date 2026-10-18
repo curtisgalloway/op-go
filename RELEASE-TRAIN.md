@@ -10,7 +10,7 @@ Homebrew tap is a repository of package recipes; a bottle is a prebuilt package.
 An apt repository provides signed Debian package indexes for installation and
 upgrades. Notarization is Apple's check of signed software. See [GLOSSARY.md](GLOSSARY.md).
 
-Derived from commit 9731a38 on 2026-10-16. Executed by the release-train skill;
+Derived from commit 505a47a on 2026-10-16. Executed by the release-train skill;
 checked by `scripts/check-release-profile.py`. UNVERIFIED means the specified
 distribution path has not completed its full qualification yet.
 
@@ -152,7 +152,7 @@ The self-invoked credential worker is the bundled helper exercised by S3.
 - automation: tag workflow refuses publication until RELEASE_QUALIFIED=true, waits for every build/install job, creates one GitHub release, dispatches op-go-release to the tap and docs.yml to rebuild apt
 - re-verify: archive public URLs are downloaded, checksum-checked and smoke-tested by verify-published on all four runners
 - re-verify: watch the tap dispatch workflow, require its version to match, then brew update/install/test in disposable macOS and Linux environments
-- re-verify: wait for docs.yml deployment, then use the README deb822 configuration in disposable Linux environments; apt update and install exact version, then S1..S5
+- re-verify: wait for docs.yml deployment, then use the README deb822 configuration in disposable Linux environments; require `gpg --show-keys` on the downloaded key to match the README fingerprint, apt update and install exact version, then S1..S5
 - failure after publication: report channel failure and open a sanitized issue; never silently delete/rewrite a public tag
 
 ## Sources
@@ -171,5 +171,5 @@ The self-invoked credential worker is the bundled helper exercised by S3.
 | `packaging/scripts/test_apt.py` | 7d62a4dcc344 | Channels: apt |
 | `scripts/smoke-release.py` | 070182aabddb | Smoke contract |
 | `go.mod` | bec09cb1bcdd | Hosts, Archaeology |
-| `README.md` | d1e5b5392a56 | Channels |
+| `README.md` | 35e97ba32a21 | Channels |
 | `RELEASING.md` | 2a8ad114d3f1 | Publish |
