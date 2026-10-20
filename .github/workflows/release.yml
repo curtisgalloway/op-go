@@ -36,6 +36,7 @@ jobs:
           INPUT_VERSION: ${{ inputs.version }}
           EVENT: ${{ github.event_name }}
           RELEASE_QUALIFIED: ${{ vars.RELEASE_QUALIFIED }}
+          RELEASE_PRERELEASE: ${{ vars.RELEASE_PRERELEASE }}
         run: |
           git merge-base --is-ancestor HEAD origin/main
           python3 - <<'PY'
@@ -46,8 +47,8 @@ jobs:
               raise SystemExit('Version must be X.Y.Z')
           if os.environ['EVENT'] == 'push' and tag != 'v' + version:
               raise SystemExit('Release tag must be vX.Y.Z')
-          if os.environ['EVENT'] == 'push' and os.environ['RELEASE_QUALIFIED'] != 'true':
-              raise SystemExit('Complete RELEASE-TRAIN.md qualification before enabling publication')
+          if os.environ['EVENT'] == 'push' and 'true' not in (os.environ['RELEASE_QUALIFIED'], os.environ['RELEASE_PRERELEASE']):
+              raise SystemExit('Complete RELEASE-TRAIN.md qualification, or set RELEASE_PRERELEASE=true for a pre-release')
           commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
           epoch = int(subprocess.check_output(['git', 'show', '-s', '--format=%ct', 'HEAD'], text=True))
           date = datetime.datetime.fromtimestamp(epoch, datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
@@ -283,10 +284,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
+          RELEASE_PRERELEASE: ${{ vars.RELEASE_PRERELEASE }}
         run: |
-          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes dist/*.tar.gz dist/*.deb dist/*.dmg dist/*.sha256
+          flags=()
+          if [ "$RELEASE_PRERELEASE" = true ]; then
+            flags=(--prerelease --notes 'Pre-release: not yet qualified against real Keychain and Secret Service stores or a dedicated 1Password test account (see VALIDATION.md). Not published to Homebrew or apt.')
+          fi
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes "${flags[@]}" dist/*.tar.gz dist/*.deb dist/*.dmg dist/*.sha256
   update-channels:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && vars.RELEASE_PRERELEASE != 'true'
     needs: [publish, prepare]
     runs-on: ubuntu-24.04
     permissions:
