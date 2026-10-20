@@ -113,6 +113,14 @@ real-store and live-account checks in VALIDATION.md. A passed offline test is
 not evidence that Keychain upgrades or a real service account work. Leave
 `RELEASE_QUALIFIED` unset while those checks are incomplete.
 
+To publish before qualification, set the repository variable
+`RELEASE_PRERELEASE` to `true` instead. The tag then creates a GitHub
+pre-release whose notes say it is unqualified, and the workflow skips the
+Homebrew tap dispatch and the apt rebuild: the apt pool takes stable releases
+only, and the tap treats every tag it receives as stable. Unset the variable
+before the first stable release, or that release is published as a
+pre-release too.
+
 Once qualified, set the repository variable to `true`. Obtain explicit approval
 for the chosen stable version, merge the candidate into main through its PR,
 and create an annotated vX.Y.Z tag on that merged commit. Pushing the approved

@@ -21,9 +21,14 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
   Debian metadata, retained versions and 30-day signed index expiry. A real
   Homebrew 7.0.9 Linux amd64 bottle pour, brew test and installed-CLI smoke check
   passed in a disposable container. These candidates were not published.
-  Native Intel macOS execution, the complete four-runner Homebrew matrix,
-  Apple notarization, the published apt site and automated tap dispatch remain
-  unverified until credentials are provisioned and the release dry run passes.
+- On 2026-10-20 the release workflow's dry run (manual dispatch, version 0.1.0,
+  commit `7c93609`) passed every build and check job with the provisioned
+  `release` environment: Developer ID signing and Apple notarization of the
+  universal macOS binary and disk image, both Linux architectures, apt
+  installation on both, and the four-runner Homebrew bottle matrix, including
+  native Intel macOS execution of the signed SDK validator. Publication jobs
+  were skipped, as a dry run requires. The published apt site and automated tap
+  dispatch remain unverified until the first tagged release.
 - Native macOS 27.0.1 arm64 checks with Go 1.27.2 passed for `9b8ebf6`:
   normal and race tests, formatting, vet, build, and the pinned vulnerability
   scan. CLI smoke checks passed for JSON output, literal environment delivery,

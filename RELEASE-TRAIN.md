@@ -10,7 +10,7 @@ Homebrew tap is a repository of package recipes; a bottle is a prebuilt package.
 An apt repository provides signed Debian package indexes for installation and
 upgrades. Notarization is Apple's check of signed software. See [GLOSSARY.md](GLOSSARY.md).
 
-Derived from commit cdb00d3 on 2026-10-16. Executed by the release-train skill;
+Derived from commit 620797e on 2026-10-16. Executed by the release-train skill;
 checked by `scripts/check-release-profile.py`. UNVERIFIED means the specified
 distribution path has not completed its full qualification yet.
 
@@ -149,7 +149,7 @@ The self-invoked credential worker is the bundled helper exercised by S3.
 
 - gate: follow [RELEASING.md](RELEASING.md); all channels must pass, no unwaived partial results, review VALIDATION.md, and obtain explicit approval before tagging/pushing
 - steps: merge tap support first; merge release infrastructure through protected main; provision credentials and protected release environment; workflow_dispatch dry run; review logs and real-store qualification; set RELEASE_QUALIFIED=true only after those gates; annotated stable tag on main; push tag after approval
-- automation: tag workflow refuses publication until RELEASE_QUALIFIED=true, waits for every build/install job, creates one GitHub release, dispatches op-go-release to the tap and docs.yml to rebuild apt
+- automation: tag workflow refuses publication until RELEASE_QUALIFIED=true, waits for every build/install job, creates one GitHub release, dispatches op-go-release to the tap and docs.yml to rebuild apt; with RELEASE_PRERELEASE=true it accepts an unqualified tag, creates a GitHub pre-release with an unqualified notice, and skips the tap dispatch and apt rebuild
 - re-verify: archive public URLs are downloaded, checksum-checked and smoke-tested by verify-published on all four runners
 - re-verify: watch the tap dispatch workflow, require its version to match, then brew update/install/test in disposable macOS and Linux environments
 - re-verify: wait for docs.yml deployment, then use the README deb822 configuration in disposable Linux environments; require `gpg --show-keys` on the downloaded key to match the README fingerprint, apt update and install exact version, then S1..S5
@@ -159,7 +159,7 @@ The self-invoked credential worker is the bundled helper exercised by S3.
 
 | path | blob | feeds |
 |---|---|---|
-| `.github/workflows/release.yml` | 26e4f883eef6 | Channels, Publish |
+| `.github/workflows/release.yml` | 59a669b6a8d9 | Channels, Publish |
 | `.github/workflows/docs.yml` | b3d2d0f08300 | Channels: apt, Publish |
 | `.github/workflows/ci.yml` | 442226c5ec7f | Project, Archaeology |
 | `scripts/build-macos.sh` | d709e9ae8d5f | Channels: source, macos |
@@ -172,4 +172,4 @@ The self-invoked credential worker is the bundled helper exercised by S3.
 | `scripts/smoke-release.py` | 070182aabddb | Smoke contract |
 | `go.mod` | bec09cb1bcdd | Hosts, Archaeology |
 | `README.md` | 35e97ba32a21 | Channels |
-| `RELEASING.md` | 2a8ad114d3f1 | Publish |
+| `RELEASING.md` | 398d59d8692e | Publish |
