@@ -221,7 +221,9 @@ jobs:
           base = 'https://github.com/curtisgalloway/op-go/releases/download/v' + os.environ['VERSION']
           path.write_text(path.read_text().replace(base, pathlib.Path('dist').resolve().as_uri()))
           PY
-          GIT_AUTHOR_NAME=release-test GIT_AUTHOR_EMAIL=test@example.invalid GIT_COMMITTER_NAME=release-test GIT_COMMITTER_EMAIL=test@example.invalid brew tap-new op-go-release/test
+          git config --global user.name release-test
+          git config --global user.email test@example.invalid
+          brew tap-new op-go-release/test
           brew --repository op-go-release/test > build/tap-path
           read -r tap_path < build/tap-path
           cp build/op-go.rb "$tap_path/Formula/op-go.rb"
