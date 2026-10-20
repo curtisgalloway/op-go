@@ -10,7 +10,7 @@ Homebrew tap is a repository of package recipes; a bottle is a prebuilt package.
 An apt repository provides signed Debian package indexes for installation and
 upgrades. Notarization is Apple's check of signed software. See [GLOSSARY.md](GLOSSARY.md).
 
-Derived from commit 505a47a on 2026-10-16. Executed by the release-train skill;
+Derived from commit cdb00d3 on 2026-10-16. Executed by the release-train skill;
 checked by `scripts/check-release-profile.py`. UNVERIFIED means the specified
 distribution path has not completed its full qualification yet.
 
@@ -159,7 +159,7 @@ The self-invoked credential worker is the bundled helper exercised by S3.
 
 | path | blob | feeds |
 |---|---|---|
-| `.github/workflows/release.yml` | f0987346b04f | Channels, Publish |
+| `.github/workflows/release.yml` | 26e4f883eef6 | Channels, Publish |
 | `.github/workflows/docs.yml` | b3d2d0f08300 | Channels: apt, Publish |
 | `.github/workflows/ci.yml` | 442226c5ec7f | Project, Archaeology |
 | `scripts/build-macos.sh` | d709e9ae8d5f | Channels: source, macos |
