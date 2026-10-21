@@ -13,6 +13,9 @@ ROOT = Path(__file__).resolve().parents[2]
 def main():
     output = Path(sys.argv[1]).resolve()
     output.mkdir(mode=0o700, parents=True, exist_ok=True)
+    # Overlay files belong to different packages. A module boundary prevents
+    # go test ./... from discovering them when output is inside the checkout.
+    (output / "go.mod").write_text("module qualification-overlay\n\ngo 1.26.10\n")
     replacements = {}
     changes = {
         "internal/store/worker.go": [

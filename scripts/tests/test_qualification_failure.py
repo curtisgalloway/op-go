@@ -20,6 +20,9 @@ finally:
     sys.path.pop(0)
 
 
+@unittest.skipUnless(
+    sys.platform.startswith("linux"), "requires Linux /proc process observation"
+)
 class FailureEvidenceTest(unittest.TestCase):
     """Use a harmless child failure, without any credentials or keyring."""
 

@@ -5,12 +5,96 @@ system libraries. D-Bus is the local messaging protocol used by Linux Secret
 Service. See [GLOSSARY.md](GLOSSARY.md).
 
 This development implementation has automated evidence for its command and
-credential-transport behavior and macOS and Linux real-account smoke checks. It has not
-completed signed-release qualification. A green suite does not prove Keychain
-access after a binary upgrade or behavior of every Linux desktop keyring.
+credential-transport behavior, dedicated-account checks on macOS and Linux,
+and a user-operated macOS signed-build upgrade check. It has not completed
+signed-release qualification. Results apply to the tested builds, operating
+systems, and credential stores, not every supported platform.
 
 ## Observed checks
 
+- The first macOS live network run stopped at the pre-stall exact-value control:
+  status 10 after 1.685 seconds, before any network-stall attempt. The original
+  private report was inspected and preserved. Its relay was in pass-through
+  mode, with one connection, one application connection, four client records,
+  and zero held replies. The source maps SDK initialization failures to status
+  10; this does not independently establish invalid credentials. No checkpoint
+  or child execution was observed, and the report retained no surviving observed
+  process. The temporary Keychain default/search list were restored and cleanup
+  succeeded. This attempt did not reach an SDK stall.
+- The subsequent explicit macOS direct control also failed: status 10 after
+  1.621 seconds, without a proxy or a network-stall attempt. Hidden enrollment
+  and private observer transport passed. No child checkpoint or surviving
+  observed process was recorded; cleanup succeeded with no reported errors.
+  Both attempts used candidate SHA-256
+  `b9cad8c672c4b0dc916e91f7e92248a5f5b45df08a250aafd27e0341c71f5402`.
+  Product source, dependencies, and signing scripts are unchanged between the
+  earlier successful source `f3d46f2` and this build's source `071cbe5`.
+  Failure without forwarding rules out the qualification proxy as a necessary
+  cause, but did not identify the initialization error. No automatic
+  authentication retry was performed.
+- The operator subsequently confirmed the test token had expired. With a renewed
+  token, the same candidate passed the direct control on October 21, 2026:
+  all 14 recorded checks passed, including exact-value delivery in 3.621 seconds,
+  output redaction, the child-after-exec checkpoint, enrollment removal, and
+  missing-enrollment status 3. Cleanup succeeded with no reported errors or
+  surviving observed processes. This supports expired credentials as the cause
+  of the preceding initialization failures. The direct run observed no credential
+  workers and does not expand process coverage or qualify network stalls;
+  the subsequent network run below supplies that separate evidence.
+- The subsequent macOS live network run on October 21, 2026 passed all 53
+  recorded checks with the same candidate. Unmodified candidate stalls returned
+  status 20 at 30.037 and 5.047 seconds, with pending-network evidence and no
+  child execution. Exact-value controls passed before and after the stalls.
+  Instrumented initialization stalled to status 20 at 5.045 seconds; resolution
+  stalls returned status 20 at 30.059 and 5.069 seconds. Five live credential
+  workers were observed at synchronized checkpoints across the instrumented
+  operations, with no token exposure detected. Restored-network delivery,
+  enrollment removal, and missing status 3 passed. Cleanup succeeded with no
+  reported errors. This uses per-process forwarding, not network namespace
+  isolation; checkpoint evidence does not establish universal unmodified-worker
+  coverage or memory/debugger resistance.
+- The checked-in macOS qualification runner was exercised from build source
+  `071cbe5` with Go 1.27.3. Its synthetic run passed all 62 recorded checks,
+  including hidden terminal enrollment and echo restoration, piped replacement,
+  synchronized worker request/result observation, successful synthetic launch,
+  removal, locked status 11, denied status 12, and child suppression. Fifteen
+  workers were counted across the regular instrumented operations; the separate
+  hidden-enrollment check also required matching request/result observations and
+  confirmed exit. No sentinel exposure was observed at those checkpoints.
+  This is instrumented synthetic evidence, not a claim about every instant of
+  the unmodified candidate. The original Keychain default/search list were
+  restored and the disposable Keychain removed; the report confirms cleanup.
+- The checked-in credential-free TLS fixture also passed on macOS: handshake
+  withholding reproduced the separate transport timeout at 10.014 seconds;
+  withholding application replies after verified TLS/request writing exercised
+  context deadlines at 30.003 and 5.001 seconds. Restored forwarding succeeded.
+  These local transport-fixture results do not qualify a real macOS SDK network
+  stall. The checked-in live runner is prepared but still requires local hidden
+  token entry; it must not be recorded as passed before it runs.
+- A subsequent user-operated macOS run completed 29 checks using two universal
+  Developer ID-signed binaries built with Go 1.27.3 from exact source commit
+  `f3d46f2391cec2147ca1d14633a6fc8b7d7accaa`. The `0.1.0-dev` baseline SHA-256 was
+  `696251cf1b0c1d79807dccb2d3ce758b23e8a00ccf0a0e53c058472ffc796b0f`;
+  the `0.1.1-dev` candidate SHA-256 was
+  `3aa2b88fffdb6c873228a2b45a469413f1a6c036318075fdd191238155cedccd`.
+  Both binaries passed signature, embedded-version and source checks, the
+  signed offline SDK validator, and offline CLI smoke checks. After enrollment
+  and exact live delivery, replacement at the same executable path retained
+  access without re-enrollment. The user confirmed no new permission prompt
+  or trust repair. All 20 fresh-process lookups passed: five each with vault/item
+  names/names, names/IDs, IDs/names, and IDs/IDs. Each asserted the exact harmless
+  test value and absence of authentication variables. Removal succeeded and
+  doctor then returned status 3. This pins the development-build upgrade
+  evidence to a source commit; it does not establish notarized-package upgrade
+  behavior or explain the historical lookup intermittency.
+- Inspection of that run's saved JSON report found 1,372 successful process
+  samples across 24 sampled operations, 15 process-read errors, and no detected
+  token in sampled arguments/environments or captured command output. No
+  credential worker was observed. Consequently, worker coverage is incomplete;
+  the absence of detected exposure must not be read as a complete security
+  qualification. Enrollment used hidden Python input piped to `enroll --stdin`,
+  so this observer did not exercise op-go's interactive hidden-enrollment path.
+  No real SDK network-stall test was performed.
 - Linux follow-up qualification uses clean merge
   `f3d46f2391cec2147ca1d14633a6fc8b7d7accaa`, matching the coordinated macOS
   source, with Go 1.26.10, Ubuntu 26.04.1 amd64, and GNOME Keyring 50.0. The
@@ -107,6 +191,29 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
   build, the offline CLI smoke contract, and the release-profile check passed. Earlier
   real-keyring results below remain evidence for their recorded Go 1.26.9
   candidate; they do not qualify a rebuilt release candidate automatically.
+- During the 2026-10-20 validation session, the user supplied successful
+  terminal transcripts from macOS 27.0.1 ARM64 using a dedicated test service
+  account and disposable application value. Hidden enrollment, metadata,
+  exact nonempty child-environment delivery, and absence of authentication
+  variables passed. The child checked `OP_SERVICE_ACCOUNT_TOKEN`,
+  `OP_CONNECT_TOKEN`, and every `OP_SESSION_` variable; the latter two types
+  were seeded with harmless dummy values. Approved overwrite and subsequent
+  delivery passed. A second Developer ID-signed build changed the embedded
+  version from `0.1.0-dev` to `0.1.1-dev`; the script required different binary
+  bytes and verified live retrieval without re-enrollment. Removal succeeded
+  and metadata inspection then returned missing-enrollment status 3. Both
+  builds passed the signed offline SDK validator. These were local signed,
+  non-notarized builds, not downloaded release packages; their embedded commit
+  and date were `unknown`, so the transcripts do not pin the source commit.
+- A second user-supplied macOS transcript verified an isolated temporary
+  Keychain with synthetic invalid token data. Locked metadata/read checks
+  returned status 11; a restricted item's metadata remained readable, while
+  token access returned status 12. Neither failed launch executed its child.
+  The user confirmed no graphical permission prompts. The script restored
+  the original default Keychain and search list and removed the temporary
+  Keychain. These results close the tested platform's locked/denied cases;
+  they do not qualify other macOS versions or establish process-exposure
+  coverage. The developer's test enrollment was removed by the first script.
 - On 2026-10-20, a clean-source Linux amd64 candidate from
   `27de464d7f1f4db40154c2d65abc1daa4ec1d5d2` built with Go 1.26.9 and
   cgo disabled passed real GNOME Keyring 50.0 checks on Ubuntu 26.04.1.
@@ -365,34 +472,60 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
 The automated tests do not read or modify the user's Keychain or desktop keyring.
 CI uses a private D-Bus instance and fake values. No real 1Password account is needed.
 
-## Checks required before a supported release
+## Qualification summary and remaining checks
 
-- Exercise dedicated test items in actual Keychain and Secret Service stores:
-  enroll, read, overwrite, remove, locked-store refusal, and denial without prompts.
-  The Linux isolated GNOME Keyring 50.0 lifecycle and private-bus denial checks
-  above are complete; this does not qualify other providers or desktop GUI policy.
-- Verify Keychain item access with the chosen macOS signing identity and after an
-  upgrade. The login-Keychain APIs used to disable interaction and check lock state
-  compile but are deprecated by Apple; their behavior must be qualified on each
-  supported macOS version.
-- Dedicated-account exact delivery and actual stalled SDK network requests now
-  pass on Linux, including default/custom deadlines, initialization and
-  resolution phases, and restored-network controls. The bounded twenty-read
-  name/ID investigation did not reproduce the historical lookup failures or
-  establish their cause. Record an explicit release decision on that unresolved
-  history. Store-request timeout evidence remains separate from SDK evidence.
-- Inspect process arguments/environments during enrollment, retrieval, and launch
-  with test sentinels on both operating systems. The macOS live launch sampling
-  above does not cover enrollment or every retrieval worker. Linux synchronized
-  instrumented checks now cover hidden/piped synthetic enrollment, replacement,
-  retrieval, every reported credential worker, and successful live launch as
-  described above. This does not establish universal exposure absence for an
-  uninstrumented release binary. Reconcile corresponding macOS evidence for the
-  selected release source and signed artifacts before qualification.
+| Area | Evidence and scope | Remaining work |
+|---|---|---|
+| macOS credential lifecycle | User transcripts: enrollment, approved replacement, exact live delivery, filtering, removal on macOS 27.0.1 ARM64 | Does not establish declined-consent behavior or other macOS versions |
+| macOS signed upgrade | Source-pinned universal signed development builds retained access without re-enrollment | Notarized-package upgrade remains separate |
+| macOS locked/denied reads | Temporary real Keychain; statuses 11/12; no child or GUI prompt | Qualify additional supported macOS versions or explicitly limit support |
+| Linux credential lifecycle | Dedicated-account checks, consent, lock/unlock, denial and cleanup on Ubuntu 26.04.1 / GNOME Keyring 50.0, source-pinned amd64 candidate | Desktop graphical prompt behavior and other providers are not established |
+| Store timeout | Stopped real Linux keyring daemon; status 20 after about five seconds | Separate from SDK network timeout |
+| Process exposure | Linux synchronized synthetic/live checks; macOS synchronized synthetic/live worker checks | Instrumentation does not establish universal candidate coverage |
+| SDK network timeout | Linux live candidate deadlines at 30.048/5.023 seconds; macOS live candidate deadlines at 30.037/5.047 seconds; separate instrumented initialization/resolution checks and recovery passed on both platforms | Coverage applies to the tested builds and forwarding setup |
+| Name/ID lookups | All 20 source-pinned matrix reads passed on each platform | Historical intermittency not reproduced; explicit residual-risk decision required |
+| Distribution | Signing/notarization and native four-platform install dry run passed | Final candidate verification and post-publication Homebrew/apt checks |
 
-Real-store and real-account checks are intentionally separate from default tests
-and require explicit authorization. No credentials are embedded in examples,
-fixtures, logs, or this document.
+### Recommended order for closing the gaps
+
+Repeatable build and test commands for both platforms are checked in under
+[scripts/qualification](scripts/qualification/README.md). Private reports and
+generated binaries remain outside version control. A checked-in test is not
+evidence of a live pass until its recorded run completes.
+
+1. **Review and integrate the combined evidence.** The Linux network/process
+   branch records both the original TLS-handshake stall failure and the repaired
+   live run. Preserve both. The failure was a test-placement error, not proof
+   of invalid credentials or a broken thirty-second deadline. Run the targeted
+   regression tests and required CI before integrating the qualification tools.
+2. **Retain the completed macOS live observation evidence.** Five live workers
+   passed synchronized checks. Keep these instrumented checkpoints distinct
+   from unmodified candidate sampling; do not claim universal coverage.
+3. **Retain the completed macOS network-timeout evidence.** Candidate and
+   instrumented SDK stalls passed with pending-network evidence, restored-network
+   controls, and verified cleanup. No additional live repetition is required
+   unless relevant code, packaging, or unresolved findings justify it.
+4. **Decide the bounded lookup outcome.** The planned twenty-read matrix passed
+   on each platform. No further broad repetitions are required without a new
+   failure. Historical intermittency remains unexplained: document that fact
+   and obtain an explicit release decision rather than declaring a fix or
+   claiming IDs eliminate the issue. Preserve sanitized error categories if
+   a future run reproduces it; do not automatically retry authentication errors.
+5. **Verify the final distribution artifacts.** Carry the source-pinned macOS
+   development-build upgrade check forward to the notarized candidate packages.
+   Keep support claims limited to qualified OS/provider combinations. Re-run
+   candidate build/install checks if code or packaging changes. After approval
+   and publication, verify the tap update and apt deployment, then install the
+   published exact version in disposable environments and check signatures,
+   checksums and smoke behavior. Linux qualification skipped apt script tests
+   where tools were unavailable; the appropriate CI/disposable environment must
+   supply that coverage. Channel dispatch acceptance alone is not a pass.
+
+Real-store and real-account checks remain separate from default tests and
+require explicit authorization. No credentials are embedded in examples,
+fixtures, logs, or this document. Keep `RELEASE_QUALIFIED` unset until the
+remaining pre-publication requirements and any explicit scope decisions have
+been reviewed; this consolidation does not approve publication.
 
 ## Dependency selection
 
