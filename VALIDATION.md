@@ -37,8 +37,18 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
   hidden live enrollment or successful live launch, and does not prove every
   short-lived worker was observed. No graphical display was configured for these
   private sessions; desktop prompt behavior was not tested by this run.
-  Normal Go tests and vet passed. Dedicated-account live delivery and interactive
-  overwrite/removal consent for this candidate await local token entry.
+  Normal Go tests and vet passed.
+- A subsequent user-operated run of the same candidate passed hidden enrollment,
+  metadata inspection, and exact delivery of the dedicated test account's harmless
+  value into a child, with authentication variables absent. The run seeded
+  `OP_CONNECT_TOKEN` and `OP_SESSION_TEST` with harmless values and started without
+  `OP_SERVICE_ACCOUNT_TOKEN`. At the decline-overwrite step the user entered
+  `yes` instead of `no`; replacement returned 0, while the runner expected 2 and
+  stopped. This is a test-input mismatch, not evidence of a consent defect.
+  Post-replacement delivery, decline preservation, post-unlock live delivery,
+  and interactive removal consent remain untested in this run. Cleanup completed:
+  the disposable keyring was deleted and its private services stopped; the
+  desktop enrollment was unchanged.
 - The release infrastructure was exercised locally with disposable candidates:
   a Developer ID-signed universal macOS binary passed signature verification,
   the signed offline SDK validator and the CLI smoke contract. Both Linux
