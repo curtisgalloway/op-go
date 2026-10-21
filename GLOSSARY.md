@@ -30,3 +30,8 @@
 - **WebAssembly:** A portable executable format used internally by the 1Password SDK.
 - **File descriptor:** A process-local handle for an open file, socket, or pipe.
 - **Close-on-exec:** A flag that closes an open handle when a process replaces itself.
+- **Network namespace:** A separate set of Linux network interfaces and routes, used here to isolate qualification traffic from the host's network configuration.
+- **CONNECT proxy:** A forwarding service that carries encrypted TLS connections without decrypting their contents.
+- **TLS:** The encryption and certificate-verification protocol used for HTTPS connections.
+- **Qualification checkpoint:** A pause added only to an instrumented test build so an observer can inspect a specific process phase reliably.
+- **Go overlay:** A build-time mapping that substitutes source files without editing the original checkout files.

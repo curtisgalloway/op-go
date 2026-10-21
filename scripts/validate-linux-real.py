@@ -365,6 +365,7 @@ class Validation:
             self.unlock("separate correct password unlock", password=self.password)
             if self.args.live:
                 delivery("live delivery after unlock")
+                self.additional_checks()
                 print("At the removal prompt enter no.", flush=True)
                 self.cli(
                     "removal declined", ["remove"], expected=2, terminal=True, limit=300
@@ -383,6 +384,9 @@ class Validation:
                 self.daemon.send_signal(signal.SIGCONT)
         self.cli("approved removal", ["remove", "--yes"])
         self.cli("missing enrollment after removal", ["doctor", "--json"], expected=3)
+
+    def additional_checks(self):
+        """Extension point while the dedicated enrollment is still available."""
 
     def close(self):
         if self.active and self.active.poll() is None:
