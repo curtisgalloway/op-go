@@ -86,7 +86,22 @@ setup. It does not modify desktop credentials or host firewall/DNS configuration
 Read the local-operation section below for live IDs, reports and recovery.
 Run `--synthetic` first; `--preflight` checks namespace/verified HTTPS forwarding;
 then run the live checks. Use `--network-only` for an affected-check rerun.
-All four executables from the shared builder are suitable for those arguments.
+The executables from the shared builder are suitable for those arguments.
+The synthetic run does not use account IDs; `/dev/null` satisfies the unused
+argument without writing an account file.
+
+```sh
+python3 scripts/qualification/run.py --synthetic --binary release-logs/qualification-build/candidate --instrumented release-logs/qualification-build/instrumented --probe release-logs/qualification-build/probe --ids /dev/null --report release-logs/linux-synthetic.json
+```
+
+After synthetic checks pass, prepare the private nonsecret ID file at the
+prompts, then run preflight and live checks. Enter only the IDs at the Python
+prompts; the account token belongs only at op-go's later hidden prompt.
+
+```sh
+python3 -c 'import json,os,pathlib; os.umask(0o077); p=pathlib.Path("release-logs/qualification-ids.json"); p.write_text(json.dumps({"vault":input("Test vault ID: ").strip(), "item":input("Test item ID: ").strip()}))'
+python3 scripts/qualification/run.py --preflight --binary release-logs/qualification-build/candidate --instrumented release-logs/qualification-build/instrumented --probe release-logs/qualification-build/probe --ids release-logs/qualification-ids.json --report release-logs/linux-preflight.json && python3 scripts/qualification/run.py --binary release-logs/qualification-build/candidate --instrumented release-logs/qualification-build/instrumented --probe release-logs/qualification-build/probe --ids release-logs/qualification-ids.json --report release-logs/linux-live.json
+```
 
 ## Automated tests and credential-free transport checks
 

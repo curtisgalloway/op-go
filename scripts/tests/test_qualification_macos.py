@@ -3,6 +3,7 @@
 """Portable tests of macOS observer rejection and safe Keychain restoration."""
 
 import importlib.util
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -62,6 +63,33 @@ class MacObserverTests(unittest.TestCase):
             return_value=SimpleNamespace(returncode=0, stdout=b"123"),
         ):
             self.assertTrue(observer.descendant(456))
+
+
+class FailureEvidenceTests(unittest.TestCase):
+    """A failed macOS timeout verdict retains actual status and child evidence."""
+
+    def test_status_mismatch_preserves_attempt(self):
+        q = object.__new__(MAC.MacQualification)
+        with tempfile.TemporaryDirectory() as directory:
+            q.root = q.shared = Path(directory)
+            q.args = SimpleNamespace(binary=Path(sys.executable))
+            q.env = {
+                k: v for k, v in os.environ.items() if k != "OP_SERVICE_ACCOUNT_TOKEN"
+            }
+            q.observer = SimpleNamespace(events=[], token=b"")
+            q.report = {"checks": [], "operations": []}
+            q.active = None
+            marker = q.root / "child-marker"
+            with self.assertRaises(RuntimeError):
+                q.stalled_run(
+                    "intentional mismatch", ["-c", "raise SystemExit(10)"], 30, marker
+                )
+            attempt = q.report["network_attempts"][-1]
+            self.assertEqual(attempt["operation"]["actual_status"], 10)
+            self.assertEqual(attempt["operation"]["expected_status"], 20)
+            self.assertFalse(attempt["child_marker_present"])
+            self.assertFalse(attempt["operation"]["surviving_observed_pids"])
+            self.assertGreaterEqual(attempt["operation"]["seconds"], 0)
 
 
 class CleanupTests(unittest.TestCase):

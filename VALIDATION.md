@@ -12,6 +12,24 @@ systems, and credential stores, not every supported platform.
 
 ## Observed checks
 
+- The checked-in macOS qualification runner was exercised from build source
+  `071cbe5` with Go 1.27.3. Its synthetic run passed all 62 recorded checks,
+  including hidden terminal enrollment and echo restoration, piped replacement,
+  synchronized worker request/result observation, successful synthetic launch,
+  removal, locked status 11, denied status 12, and child suppression. Fifteen
+  workers were counted across the regular instrumented operations; the separate
+  hidden-enrollment check also required matching request/result observations and
+  confirmed exit. No sentinel exposure was observed at those checkpoints.
+  This is instrumented synthetic evidence, not a claim about every instant of
+  the unmodified candidate. The original Keychain default/search list were
+  restored and the disposable Keychain removed; the report confirms cleanup.
+- The checked-in credential-free TLS fixture also passed on macOS: handshake
+  withholding reproduced the separate transport timeout at 10.014 seconds;
+  withholding application replies after verified TLS/request writing exercised
+  context deadlines at 30.003 and 5.001 seconds. Restored forwarding succeeded.
+  These local transport-fixture results do not qualify a real macOS SDK network
+  stall. The checked-in live runner is prepared but still requires local hidden
+  token entry; it must not be recorded as passed before it runs.
 - A subsequent user-operated macOS run completed 29 checks using two universal
   Developer ID-signed binaries built with Go 1.27.3 from exact source commit
   `f3d46f2391cec2147ca1d14633a6fc8b7d7accaa`. The `0.1.0-dev` baseline SHA-256 was
@@ -422,7 +440,7 @@ CI uses a private D-Bus instance and fake values. No real 1Password account is n
 | macOS locked/denied reads | Temporary real Keychain; statuses 11/12; no child or GUI prompt | Qualify additional supported macOS versions or explicitly limit support |
 | Linux credential lifecycle | Dedicated-account checks, consent, lock/unlock, denial and cleanup on Ubuntu 26.04.1 / GNOME Keyring 50.0, source-pinned amd64 candidate | Desktop graphical prompt behavior and other providers are not established |
 | Store timeout | Stopped real Linux keyring daemon; status 20 after about five seconds | Separate from SDK network timeout |
-| Process exposure | Linux synchronized synthetic/live checks plus candidate sampling; macOS live sampling | macOS observer saw no workers; instrumented Linux evidence does not establish universal candidate coverage |
+| Process exposure | Linux synchronized synthetic/live checks; macOS synchronized synthetic worker checks and prior live sampling | macOS synchronized live check pending; instrumentation does not establish universal candidate coverage |
 | SDK network timeout | Linux live candidate deadlines at 30.048/5.023 seconds; separate instrumented initialization/resolution checks and recovery passed | macOS transport has not been exercised with actual stalled traffic |
 | Name/ID lookups | All 20 source-pinned matrix reads passed on each platform | Historical intermittency not reproduced; explicit residual-risk decision required |
 | Distribution | Signing/notarization and native four-platform install dry run passed | Final candidate verification and post-publication Homebrew/apt checks |
@@ -439,14 +457,11 @@ evidence of a live pass until its recorded run completes.
    live run. Preserve both. The failure was a test-placement error, not proof
    of invalid credentials or a broken thirty-second deadline. Run the targeted
    regression tests and required CI before integrating the qualification tools.
-2. **Close the macOS observation gap.** Adapt the Linux checkpoint approach to
-   a separately instrumented, Developer ID-signed macOS build, preserving its
-   distinction from the unmodified candidate. Observe hidden/piped enrollment,
-   retrieval workers and successful launch using only private in-memory token
-   comparison and pass/fail output. Correlate worker creation, checkpoints and
-   exit; do not substitute an increased sample count for missing worker coverage.
-   Confirm signing protections match the candidate; never weaken the deployed
-   binary's protections to inspect it. The current macOS report saw no workers.
+2. **Complete the macOS live observation check.** The checked-in signed
+   instrumented build now passes synchronized synthetic worker observation.
+   Run its live mode to add successful real-account launch observations. Keep
+   those checkpoints distinct from unmodified candidate sampling; never weaken
+   the deployed binary's signing protections or claim universal coverage.
 3. **Decide macOS network-timeout scope.** Linux now has actual candidate and
    instrumented SDK stall evidence at both deadlines, with verified TLS and
    restored-network controls. For equivalent macOS evidence, adapt the verified
