@@ -68,6 +68,8 @@ backticks, and inline `#` have no special meaning. A complete value beginning wi
 keys, or `export` prefixes. Entries override inherited values. The executable is
 located using the original PATH before applying those overrides.
 
+Prefer vault and item IDs in references (`op://<vault-id>/<item-id>/field`): IDs
+survive renames and cannot match two items. Names are also supported.
 Reference names support ASCII letters, digits, spaces, `_`, `.`, and `-`.
 For names containing other characters (for example, a colon in an item title),
 use that component's ID. Percent-encoding is not supported. `op-go` rejects

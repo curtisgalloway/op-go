@@ -9,15 +9,13 @@ See [the glossary](GLOSSARY.md) and [the design](DESIGN.md).
 
 This independent Go CLI supports macOS Keychain, Linux Secret Service, and an
 explicit read-only token file for headless use. It is not an official 1Password
-product. This is a development implementation, not a released security product;
-see [validation status](VALIDATION.md) for the checks and remaining limits.
+product. See [validation status](VALIDATION.md) for what has been tested and
+its limits.
 
 ## Release installation
 
 The [release process](RELEASING.md) builds macOS universal and Linux amd64/arm64
 packages and checks them using the [release-train profile](RELEASE-TRAIN.md).
-These channels become available after the first approved release; there is no
-published release or installable tap formula yet.
 
 Homebrew (macOS and Linux) installs the tested binary without compiling Go:
 
@@ -29,8 +27,7 @@ brew test curtisgalloway/tap/op-go
 Use `brew update` and `brew upgrade op-go` for subsequent releases. The tap
 updates automatically after verifying every release archive and checksum.
 
-Debian and Ubuntu use the signed apt repository, available after the first
-release. Its signing key's fingerprint is:
+Debian and Ubuntu use the signed apt repository. Its signing key's fingerprint is:
 
 ```text
 B845 C0DD 6090 B15E 11E6  41FC 6A31 19CB 3C2E F629
@@ -55,7 +52,8 @@ sudo apt install op-go
 ```
 
 Subsequent `apt upgrade` runs receive new versions. Release archives and a
-signed, notarized macOS disk image will also be available from GitHub Releases,
+signed, notarized macOS disk image are also available from
+[GitHub Releases](https://github.com/curtisgalloway/op-go/releases),
 each with a checksum sidecar (a file containing its SHA-256 digest). See the
 [glossary](GLOSSARY.md) for package terminology.
 
@@ -156,9 +154,14 @@ resolve this in manual testing. `op-go` suppresses interactive permission dialog
 Create `secrets.env` with references such as:
 
 ```dotenv
-APP_TOKEN=op://example-vault/example-item/credential
+APP_TOKEN=op://abcdefghijklmnopqrstuvwxyz/zyxwvutsrqponmlkjihgfedcba/credential
 APP_MODE=development
 ```
+
+Prefer vault and item IDs over names: an ID keeps working after a rename and can
+never match two items. Copy them from the 1Password app or from
+`op item get "<item name>" --vault "<vault name>" --format json`. Names such as
+`op://Example Vault/Example Item/credential` are also supported.
 
 Preview, check enrollment metadata, and launch a command:
 

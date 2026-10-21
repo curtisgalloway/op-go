@@ -12,10 +12,8 @@ A GitHub environment groups deployment secrets and approval rules.
 See [GLOSSARY.md](GLOSSARY.md) and [RELEASE-TRAIN.md](RELEASE-TRAIN.md).
 
 This process follows the shared signing template and the paniolo apt/Homebrew
-pattern. It is implemented but not yet qualified for a supported release. Read
-[VALIDATION.md](VALIDATION.md), particularly the live resolution and real-store
-upgrade limits. No release has been published, and the install channels below
-will become available only after the first approved release.
+pattern. Read [VALIDATION.md](VALIDATION.md) for the qualification evidence and
+its limits before each release.
 
 ## Distribution
 
