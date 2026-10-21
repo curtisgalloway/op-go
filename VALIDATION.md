@@ -12,6 +12,30 @@ systems, and credential stores, not every supported platform.
 
 ## Observed checks
 
+- A subsequent user-operated macOS run completed 29 checks using two universal
+  Developer ID-signed binaries built with Go 1.27.3 from exact source commit
+  `f3d46f2391cec2147ca1d14633a6fc8b7d7accaa`. The `0.1.0-dev` baseline SHA-256 was
+  `696251cf1b0c1d79807dccb2d3ce758b23e8a00ccf0a0e53c058472ffc796b0f`;
+  the `0.1.1-dev` candidate SHA-256 was
+  `3aa2b88fffdb6c873228a2b45a469413f1a6c036318075fdd191238155cedccd`.
+  Both binaries passed signature, embedded-version and source checks, the
+  signed offline SDK validator, and offline CLI smoke checks. After enrollment
+  and exact live delivery, replacement at the same executable path retained
+  access without re-enrollment. The user confirmed no new permission prompt
+  or trust repair. All 20 fresh-process lookups passed: five each with vault/item
+  names/names, names/IDs, IDs/names, and IDs/IDs. Each asserted the exact harmless
+  test value and absence of authentication variables. Removal succeeded and
+  doctor then returned status 3. This pins the development-build upgrade
+  evidence to a source commit; it does not establish notarized-package upgrade
+  behavior or explain the historical lookup intermittency.
+- Inspection of that run's saved JSON report found 1,372 successful process
+  samples across 24 sampled operations, 15 process-read errors, and no detected
+  token in sampled arguments/environments or captured command output. No
+  credential worker was observed. Consequently, worker coverage is incomplete;
+  the absence of detected exposure must not be read as a complete security
+  qualification. Enrollment used hidden Python input piped to `enroll --stdin`,
+  so this observer did not exercise op-go's interactive hidden-enrollment path.
+  No real SDK network-stall test was performed.
 - PR #6 CI subsequently reported reachable standard-library vulnerability
   `GO-2026-6809` in Go 1.26.9 on both native platforms: compromised intermediate
   certificates in `crypto/x509`. The minimum Go version is now 1.26.10, the
@@ -306,13 +330,13 @@ CI uses a private D-Bus instance and fake values. No real 1Password account is n
 | Area | Evidence and scope | Remaining work |
 |---|---|---|
 | macOS credential lifecycle | User transcripts: enrollment, approved replacement, exact live delivery, filtering, removal on macOS 27.0.1 ARM64 | Does not establish declined-consent behavior or other macOS versions |
-| macOS signed upgrade | Different signed development binaries retained access without re-enrollment | Repeat with source-pinned candidate packages; local builds reported unknown commit/date |
+| macOS signed upgrade | Source-pinned universal signed development builds retained access without re-enrollment | Notarized-package upgrade remains separate |
 | macOS locked/denied reads | Temporary real Keychain; statuses 11/12; no child or GUI prompt | Qualify additional supported macOS versions or explicitly limit support |
 | Linux credential lifecycle | Dedicated-account checks, consent, lock/unlock, denial and cleanup on Ubuntu 26.04.1 / GNOME Keyring 50.0, source-pinned amd64 candidate | Desktop graphical prompt behavior and other providers are not established |
 | Store timeout | Stopped real Linux keyring daemon; status 20 after about five seconds | Separate from SDK network timeout |
-| Process exposure | Prior macOS live sampling and Linux synthetic enrollment/failed-launch sampling | Hidden enrollment, successful launch, and short-lived worker coverage remain incomplete |
+| Process exposure | macOS live enrollment/launch sampling and Linux synthetic enrollment/failed-launch sampling | Latest macOS observer saw no workers; interactive enrollment and complete worker coverage remain incomplete |
 | SDK network timeout | Automated cancellation tests; no actual stalled-network result | Exercise a real stalled SDK request |
-| Name/ID lookups | Successful dedicated-item resolution and earlier diagnostic matrix | Earlier intermittent failures remain unexplained |
+| Name/ID lookups | All 20 source-pinned macOS matrix reads passed; earlier Linux diagnostic matrix also passed | Updated Linux matrix pending; historical intermittency remains unexplained |
 | Distribution | Signing/notarization and native four-platform install dry run passed | Final candidate verification and post-publication Homebrew/apt checks |
 
 ### Recommended order for closing the gaps
@@ -320,9 +344,9 @@ CI uses a private D-Bus instance and fake values. No real 1Password account is n
 1. **Pin the candidate and preserve evidence.** Integrate the Linux validation
    changes and this macOS record through passing CI. Record the exact candidate
    commit, executable checksums, signing identity, OS and provider versions in
-   private run records. Repeat the macOS upgrade check using source-pinned
-   signed candidates; do not overwrite an existing enrollment merely to make
-   a failed upgrade pass. Keep support claims limited to qualified environments.
+   private run records. The macOS development-build upgrade is now source-pinned; carry that
+   check forward to the notarized candidate packages. Do not overwrite an
+   existing enrollment merely to make a failed upgrade pass. Keep support claims limited to qualified environments.
 2. **Exercise a real SDK network stall.** In a disposable Linux network
    environment, first verify successful resolution with the dedicated account.
    Then delay or drop response traffic for that test process's actual SDK
@@ -349,8 +373,8 @@ CI uses a private D-Bus instance and fake values. No real 1Password account is n
    sampling alone cannot establish absence from every inspection interface.
 4. **Bound the lookup investigation.** On the same dedicated item, compare
    names/names, names/IDs, IDs/names, and IDs/IDs in fresh processes on both
-   systems, using supported names and exact-value assertions. Start with five
-   runs per combination and space calls to avoid rate limits. Record only
+   systems, using supported names and exact-value assertions. The macOS five-run-per-combination matrix passed; run the same bounded
+   matrix on the updated Linux candidate and space calls to avoid rate limits. Record only
    timing, sanitized error category, platform and SDK version. Stop on an
    authentication failure or rate limit; do not automatically retry it. On a
    lookup failure, preserve the category and reproduce with a small SDK-only
