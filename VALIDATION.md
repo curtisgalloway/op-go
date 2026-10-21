@@ -11,6 +11,34 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
 
 ## Observed checks
 
+- On 2026-10-20, a clean-source Linux amd64 candidate from
+  `27de464d7f1f4db40154c2d65abc1daa4ec1d5d2` built with Go 1.26.9 and
+  cgo disabled passed real GNOME Keyring 50.0 checks on Ubuntu 26.04.1.
+  Its SHA-256 was
+  `e031b0aa61c3e643cdee2a2b738bda0476e94aecd8cbfcfdc298a3dd84188087`.
+  The existing binary reported base revision `9f760f63abb5` with modified
+  source, so a separate candidate was built without replacing it. The desktop
+  enrollment was inspected as metadata only and left unchanged.
+  `scripts/validate-linux-real.py` used private D-Bus sessions and disposable
+  real keyrings. Synthetic enrollment, metadata, retrieval reaching expected SDK
+  authentication refusal (10), removal, and missing enrollment (3) passed.
+  Locked doctor and run returned 11 in under 0.01 seconds without child execution.
+  One wrong password returned 11 without retry; a separate correct attempt
+  unlocked. SIGINT, SIGTERM, and SIGHUP at the hidden unlock prompt restored echo.
+  A private bus policy denying GetSecret returned 12 without child execution.
+  Both runs stopped their private services and deleted their temporary stores.
+- In that run, stopping the real keyring daemon with SIGSTOP caused a pending
+  doctor operation to return 20 after 5.004 seconds; the daemon was then resumed.
+  This exercises an actual stalled store request at the normal five-second
+  deadline, not a tiny configured timeout. It does **not** qualify a stalled
+  1Password network request. Synthetic-token process-tree sampling found no token
+  in sampled arguments/environments during enrollment and failed retrieval/launch;
+  no process dumps were emitted. Sampling is not exhaustive, does not cover
+  hidden live enrollment or successful live launch, and does not prove every
+  short-lived worker was observed. No graphical display was configured for these
+  private sessions; desktop prompt behavior was not tested by this run.
+  Normal Go tests and vet passed. Dedicated-account live delivery and interactive
+  overwrite/removal consent for this candidate await local token entry.
 - The release infrastructure was exercised locally with disposable candidates:
   a Developer ID-signed universal macOS binary passed signature verification,
   the signed offline SDK validator and the CLI smoke contract. Both Linux
