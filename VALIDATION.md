@@ -36,6 +36,94 @@ systems, and credential stores, not every supported platform.
   qualification. Enrollment used hidden Python input piped to `enroll --stdin`,
   so this observer did not exercise op-go's interactive hidden-enrollment path.
   No real SDK network-stall test was performed.
+- Linux follow-up qualification uses clean merge
+  `f3d46f2391cec2147ca1d14633a6fc8b7d7accaa`, matching the coordinated macOS
+  source, with Go 1.26.10, Ubuntu 26.04.1 amd64, and GNOME Keyring 50.0. The
+  candidate embeds that full commit and UTC source date `2026-10-21T02:13:50Z`;
+  its SHA-256 is
+  `9691a63ffbfb2a624a99c2a7db438effa739137ebc33d25eb3fb2b95c5558896`.
+  Automatic Go VCS discovery encountered a non-repository ancestor in the
+  isolated-worktree environment, so the build disabled automatic VCS stamping
+  and used the release script's explicit, independently checked linker metadata.
+  Installed binaries were preserved. The existing real-keyring harness passed
+  its synthetic lifecycle and private-policy denial runs on this unmodified
+  candidate, including locked status 11, denied status 12, actual stalled-store
+  timeout, terminal restoration, and cleanup. The offline CLI smoke contract
+  and release-profile consistency check also passed.
+- The opt-in tools in `scripts/qualification/` add private network forwarding,
+  a bounded lookup matrix, and synchronized process checkpoints. The pinned
+  SDK transport was inspected: Extism v1.7.1 sends context-bound requests through
+  Go's default HTTP client. An approved disposable network namespace containing
+  only loopback reached HTTPS through the private Unix-socket relay with
+  certificate verification enabled. This credential-free preflight proves the
+  isolation/forwarding setup, not an actual SDK network timeout.
+- A separate instrumented build, created through a source overlay, passed
+  hidden-terminal and piped synthetic enrollment, replacement, retrieval, and
+  successful launch using an explicitly enabled synthetic resolver fixture. All 35 instrumented
+  credential workers were correlated with request/result checkpoints or,
+  for one deliberately canceled worker, a request checkpoint and confirmed
+  exit. The observer found no synthetic token in the inspected arguments or
+  environments; no raw process data was recorded. This covers those synchronized
+  phases of the instrumented build, not every instant or every worker of the
+  unmodified candidate. The temporary keyring and private daemons were cleaned up.
+  Normal/race Go tests, vet, and pinned vulnerability scanning passed. Script
+  tests passed except for the apt-repository test, skipped because its tools were
+  unavailable.
+- The subsequent live run passed all twenty fresh-process reads (five for each
+  name/ID combination), exact harmless-value comparisons, authentication-variable
+  filtering, sampled process exposure checks, and synchronized post-exec child
+  observation. Historical lookup intermittency was not reproduced, not proven
+  fixed. The first network-stall test then failed its status assertion: expected
+  20, received 10 after 11.459 seconds. Its 29.5–35-second timing assertion was
+  not reached. The original report is preserved separately. One held relay reply
+  confirms traffic reached the forwarding path, but the relay stalled TLS before
+  handshake completion. Go's default transport has a ten-second TLS handshake
+  timeout. Source-based attribution places the resulting status 10 on the SDK
+  initialization error path; the failed uninstrumented run has no direct phase
+  checkpoint. This is a demonstrated test setup/expectation error, not evidence
+  of a broken thirty-second launcher deadline. Initialization's generic status
+  10 must not be interpreted as proof of an invalid token.
+- That failing harness version raised before recording the explicit child-marker
+  and worker-exit checks. No additional child checkpoint appears, and source flow
+  indicates initialization failed before exec after credential-worker reaping,
+  but independent final observations were not retained. The report confirms
+  keyring/relay cleanup and namespace-controller exit; subsequent inspection
+  confirmed the temporary keyring and its private daemon PIDs were absent.
+  The five-second SDK stall, restored-network control, and instrumented
+  resolution-stage stalls did not run in that attempt; the separate retry below
+  supplies their evidence.
+- The relay now permits TLS negotiation before holding application replies;
+  deadline/status assertions are unchanged. A credential-free local TLS transport
+  reproduction measured the original behavior at 10.013 seconds with no completed
+  handshake and an unexpired thirty-second context. The repaired forwarding path
+  completed certificate verification and request writing, then hit context
+  deadlines at 30.026 and 5.000 seconds; a restored-forwarding control succeeded.
+  These are transport-fixture results, not SDK or real-account timeout evidence.
+  Targeted framing/forwarding and failure-evidence regression tests passed. The
+  harness now preserves attempt diagnostics before raising and supports a
+  network-only rerun without repeating the successful lookup matrix.
+- The subsequent live network-only retry passed all 77 recorded checks against
+  the same unmodified candidate hash above. Actual pending application replies
+  were observed for each stall with TLS verification enabled. The candidate
+  returned status 20 at 30.048 seconds for its default deadline and 5.023 seconds
+  for `--timeout 5s`, within the unchanged 29.5–35 and 4.5–10-second bounds.
+  Exact-value controls before and after the stalls passed. The separate
+  instrumented build identified the first-network stall as SDK initialization
+  (status 20 at 5.023 seconds), and independently exercised secret resolution
+  after initialization (status 20 at 30.044 and 5.022 seconds). Its restored-network
+  exact-value control also passed. Every stall retained an absent child marker
+  and no surviving observed process; all five instrumented credential workers
+  had synchronized request/result observations and confirmed exit. No token
+  exposure was detected in the sampled arguments/environments, synchronized
+  checkpoints, or captured output. Uninstrumented process sampling remains
+  limited to observed processes and instants; it is not universal coverage.
+  Approved removal succeeded and doctor returned missing-enrollment status 3.
+  The report confirms isolated keyring/relay cleanup, namespace-controller exit,
+  and an unchanged host network namespace. Subsequent inspection found the
+  temporary store, private daemon PIDs, and all observed process PIDs absent.
+  The original failure report remains unchanged; the lookup matrix was not
+  repeated. These live SDK results are separate from the store-timeout and
+  credential-free transport-fixture results.
 - PR #6 CI subsequently reported reachable standard-library vulnerability
   `GO-2026-6809` in Go 1.26.9 on both native platforms: compromised intermediate
   certificates in `crypto/x509`. The minimum Go version is now 1.26.10, the
@@ -334,62 +422,49 @@ CI uses a private D-Bus instance and fake values. No real 1Password account is n
 | macOS locked/denied reads | Temporary real Keychain; statuses 11/12; no child or GUI prompt | Qualify additional supported macOS versions or explicitly limit support |
 | Linux credential lifecycle | Dedicated-account checks, consent, lock/unlock, denial and cleanup on Ubuntu 26.04.1 / GNOME Keyring 50.0, source-pinned amd64 candidate | Desktop graphical prompt behavior and other providers are not established |
 | Store timeout | Stopped real Linux keyring daemon; status 20 after about five seconds | Separate from SDK network timeout |
-| Process exposure | macOS live enrollment/launch sampling and Linux synthetic enrollment/failed-launch sampling | Latest macOS observer saw no workers; interactive enrollment and complete worker coverage remain incomplete |
-| SDK network timeout | Automated cancellation tests; no actual stalled-network result | Exercise a real stalled SDK request |
-| Name/ID lookups | All 20 source-pinned macOS matrix reads passed; earlier Linux diagnostic matrix also passed | Updated Linux matrix pending; historical intermittency remains unexplained |
+| Process exposure | Linux synchronized synthetic/live checks plus candidate sampling; macOS live sampling | macOS observer saw no workers; instrumented Linux evidence does not establish universal candidate coverage |
+| SDK network timeout | Linux live candidate deadlines at 30.048/5.023 seconds; separate instrumented initialization/resolution checks and recovery passed | macOS transport has not been exercised with actual stalled traffic |
+| Name/ID lookups | All 20 source-pinned matrix reads passed on each platform | Historical intermittency not reproduced; explicit residual-risk decision required |
 | Distribution | Signing/notarization and native four-platform install dry run passed | Final candidate verification and post-publication Homebrew/apt checks |
 
 ### Recommended order for closing the gaps
 
-1. **Pin the candidate and preserve evidence.** Integrate the Linux validation
-   changes and this macOS record through passing CI. Record the exact candidate
-   commit, executable checksums, signing identity, OS and provider versions in
-   private run records. The macOS development-build upgrade is now source-pinned; carry that
-   check forward to the notarized candidate packages. Do not overwrite an
-   existing enrollment merely to make a failed upgrade pass. Keep support claims limited to qualified environments.
-2. **Exercise a real SDK network stall.** In a disposable Linux network
-   environment, first verify successful resolution with the dedicated account.
-   Then delay or drop response traffic for that test process's actual SDK
-   connection. Preserve access to the isolated local credential store. Confirm
-   the request reached the network and remained pending; an immediate DNS,
-   connection-refused, authentication, or certificate error is not a stall.
-   Test both the normal 30-second SDK deadline and a shorter nonzero deadline,
-   measuring elapsed time and expecting status 20 with no child execution and
-   no surviving worker. Allow bounded scheduling/cleanup overhead and document
-   it. Do not disable TLS verification, record packet payloads, or alter the
-   host's shared firewall. First inspect the pinned SDK's transport support;
-   do not assume it honors HTTP proxy environment variables. Repeat on macOS
-   or state explicitly that only Linux transport behavior was exercised.
-3. **Close the process-observation gaps.** Use synthetic sentinel tokens
-   (distinctive disposable strings) to inspect hidden enrollment, replacement,
-   credential retrieval, and every private worker on both operating systems.
-   Use synchronized test checkpoints where necessary so short-lived workers
-   cannot simply escape the observation window. For successful live launch,
-   use the dedicated test account; any comparison with its actual token must
-   remain in memory and emit only pass/fail. Never persist process dumps or
-   token values, lengths, or fingerprints. Verify the child still receives the
-   harmless application value and excludes authentication variables. Clearly
-   distinguish observations of the actual candidate from instrumented builds;
-   sampling alone cannot establish absence from every inspection interface.
-4. **Bound the lookup investigation.** On the same dedicated item, compare
-   names/names, names/IDs, IDs/names, and IDs/IDs in fresh processes on both
-   systems, using supported names and exact-value assertions. The macOS five-run-per-combination matrix passed; run the same bounded
-   matrix on the updated Linux candidate and space calls to avoid rate limits. Record only
-   timing, sanitized error category, platform and SDK version. Stop on an
-   authentication failure or rate limit; do not automatically retry it. On a
-   lookup failure, preserve the category and reproduce with a small SDK-only
-   program and the official CLI, using their supported credential handling.
-   A clean matrix bounds current reproducibility; it does not explain history.
-   If the old failure remains unreproduced, document that residual limitation
+1. **Review and integrate the combined evidence.** The Linux network/process
+   branch records both the original TLS-handshake stall failure and the repaired
+   live run. Preserve both. The failure was a test-placement error, not proof
+   of invalid credentials or a broken thirty-second deadline. Run the targeted
+   regression tests and required CI before integrating the qualification tools.
+2. **Close the macOS observation gap.** Adapt the Linux checkpoint approach to
+   a separately instrumented, Developer ID-signed macOS build, preserving its
+   distinction from the unmodified candidate. Observe hidden/piped enrollment,
+   retrieval workers and successful launch using only private in-memory token
+   comparison and pass/fail output. Correlate worker creation, checkpoints and
+   exit; do not substitute an increased sample count for missing worker coverage.
+   Confirm signing protections match the candidate; never weaken the deployed
+   binary's protections to inspect it. The current macOS report saw no workers.
+3. **Decide macOS network-timeout scope.** Linux now has actual candidate and
+   instrumented SDK stall evidence at both deadlines, with verified TLS and
+   restored-network controls. For equivalent macOS evidence, adapt the verified
+   per-process forwarding path, verify that candidate SDK traffic actually uses
+   it, and retain timing, child-marker and cleanup checks without changing the
+   shared host firewall. If qualification relies on the shared SDK/transport
+   implementation instead, explicitly approve and record that platform limit;
+   do not claim a macOS network-stall pass from Linux results.
+4. **Decide the bounded lookup outcome.** The planned twenty-read matrix passed
+   on each platform. No further broad repetitions are required without a new
+   failure. Historical intermittency remains unexplained: document that fact
    and obtain an explicit release decision rather than declaring a fix or
-   claiming ID references eliminate the issue.
-5. **Finish distribution verification at the appropriate stage.** Re-run
-   candidate build/install checks if code or packaging changes. After the
-   approved stable release, confirm the tap update and apt deployment, then
-   install the published exact version in disposable environments and verify
-   checksums, signing and smoke checks. Dispatch acceptance is not evidence
-   of a successful channel update. These post-publication checks cannot be
-   claimed before assets and repositories exist.
+   claiming IDs eliminate the issue. Preserve sanitized error categories if
+   a future run reproduces it; do not automatically retry authentication errors.
+5. **Verify the final distribution artifacts.** Carry the source-pinned macOS
+   development-build upgrade check forward to the notarized candidate packages.
+   Keep support claims limited to qualified OS/provider combinations. Re-run
+   candidate build/install checks if code or packaging changes. After approval
+   and publication, verify the tap update and apt deployment, then install the
+   published exact version in disposable environments and check signatures,
+   checksums and smoke behavior. Linux qualification skipped apt script tests
+   where tools were unavailable; the appropriate CI/disposable environment must
+   supply that coverage. Channel dispatch acceptance alone is not a pass.
 
 Real-store and real-account checks remain separate from default tests and
 require explicit authorization. No credentials are embedded in examples,
