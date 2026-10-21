@@ -20,9 +20,20 @@ systems, and credential stores, not every supported platform.
   10; this does not independently establish invalid credentials. No checkpoint
   or child execution was observed, and the report retained no surviving observed
   process. The temporary Keychain default/search list were restored and cleanup
-  succeeded. No actual macOS SDK stall has passed. A separate, explicitly
-  requested direct control is needed to distinguish forwarded-path behavior
-  from account/SDK initialization failure; authentication was not retried.
+  succeeded. No actual macOS SDK stall has passed.
+- The subsequent explicit macOS direct control also failed: status 10 after
+  1.621 seconds, without a proxy or a network-stall attempt. Hidden enrollment
+  and private observer transport passed. No child checkpoint or surviving
+  observed process was recorded; cleanup succeeded with no reported errors.
+  Both attempts used candidate SHA-256
+  `b9cad8c672c4b0dc916e91f7e92248a5f5b45df08a250aafd27e0341c71f5402`.
+  Product source, dependencies, and signing scripts are unchanged between the
+  earlier successful source `f3d46f2` and this build's source `071cbe5`.
+  Failure without forwarding rules out the qualification proxy as a necessary
+  cause, but does not identify the initialization error. Account/token state,
+  SDK behavior, and environmental differences remain unresolved. No automatic
+  authentication retry was performed. Verify the dedicated account/token state
+  before another live attempt; do not treat status 10 as proof of revocation.
 - The checked-in macOS qualification runner was exercised from build source
   `071cbe5` with Go 1.27.3. Its synthetic run passed all 62 recorded checks,
   including hidden terminal enrollment and echo restoration, piped replacement,
