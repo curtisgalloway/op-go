@@ -11,6 +11,14 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
 
 ## Observed checks
 
+- PR #6 CI subsequently reported reachable standard-library vulnerability
+  `GO-2026-6809` in Go 1.26.9 on both native platforms: compromised intermediate
+  certificates in `crypto/x509`. The minimum Go version is now 1.26.10, the
+  scanner's reported fixed version. The pinned govulncheck v1.9.0 scan with
+  Go 1.26.10 returned no vulnerabilities locally. Race tests, vet, a native
+  build, the offline CLI smoke contract, and the release-profile check passed. Earlier
+  real-keyring results below remain evidence for their recorded Go 1.26.9
+  candidate; they do not qualify a rebuilt release candidate automatically.
 - On 2026-10-20, a clean-source Linux amd64 candidate from
   `27de464d7f1f4db40154c2d65abc1daa4ec1d5d2` built with Go 1.26.9 and
   cgo disabled passed real GNOME Keyring 50.0 checks on Ubuntu 26.04.1.
