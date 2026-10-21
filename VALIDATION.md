@@ -20,7 +20,7 @@ systems, and credential stores, not every supported platform.
   10; this does not independently establish invalid credentials. No checkpoint
   or child execution was observed, and the report retained no surviving observed
   process. The temporary Keychain default/search list were restored and cleanup
-  succeeded. No actual macOS SDK stall has passed.
+  succeeded. This attempt did not reach an SDK stall.
 - The subsequent explicit macOS direct control also failed: status 10 after
   1.621 seconds, without a proxy or a network-stall attempt. Hidden enrollment
   and private observer transport passed. No child checkpoint or surviving
@@ -40,7 +40,19 @@ systems, and credential stores, not every supported platform.
   surviving observed processes. This supports expired credentials as the cause
   of the preceding initialization failures. The direct run observed no credential
   workers and does not expand process coverage or qualify network stalls;
-  the live network checks remain outstanding.
+  the subsequent network run below supplies that separate evidence.
+- The subsequent macOS live network run on October 21, 2026 passed all 53
+  recorded checks with the same candidate. Unmodified candidate stalls returned
+  status 20 at 30.037 and 5.047 seconds, with pending-network evidence and no
+  child execution. Exact-value controls passed before and after the stalls.
+  Instrumented initialization stalled to status 20 at 5.045 seconds; resolution
+  stalls returned status 20 at 30.059 and 5.069 seconds. Five live credential
+  workers were observed at synchronized checkpoints across the instrumented
+  operations, with no token exposure detected. Restored-network delivery,
+  enrollment removal, and missing status 3 passed. Cleanup succeeded with no
+  reported errors. This uses per-process forwarding, not network namespace
+  isolation; checkpoint evidence does not establish universal unmodified-worker
+  coverage or memory/debugger resistance.
 - The checked-in macOS qualification runner was exercised from build source
   `071cbe5` with Go 1.27.3. Its synthetic run passed all 62 recorded checks,
   including hidden terminal enrollment and echo restoration, piped replacement,
@@ -469,8 +481,8 @@ CI uses a private D-Bus instance and fake values. No real 1Password account is n
 | macOS locked/denied reads | Temporary real Keychain; statuses 11/12; no child or GUI prompt | Qualify additional supported macOS versions or explicitly limit support |
 | Linux credential lifecycle | Dedicated-account checks, consent, lock/unlock, denial and cleanup on Ubuntu 26.04.1 / GNOME Keyring 50.0, source-pinned amd64 candidate | Desktop graphical prompt behavior and other providers are not established |
 | Store timeout | Stopped real Linux keyring daemon; status 20 after about five seconds | Separate from SDK network timeout |
-| Process exposure | Linux synchronized synthetic/live checks; macOS synchronized synthetic worker checks and prior live sampling | macOS synchronized live check pending; instrumentation does not establish universal candidate coverage |
-| SDK network timeout | Linux live candidate deadlines at 30.048/5.023 seconds; separate instrumented initialization/resolution checks and recovery passed | macOS transport has not been exercised with actual stalled traffic |
+| Process exposure | Linux synchronized synthetic/live checks; macOS synchronized synthetic/live worker checks | Instrumentation does not establish universal candidate coverage |
+| SDK network timeout | Linux live candidate deadlines at 30.048/5.023 seconds; macOS live candidate deadlines at 30.037/5.047 seconds; separate instrumented initialization/resolution checks and recovery passed on both platforms | Coverage applies to the tested builds and forwarding setup |
 | Name/ID lookups | All 20 source-pinned matrix reads passed on each platform | Historical intermittency not reproduced; explicit residual-risk decision required |
 | Distribution | Signing/notarization and native four-platform install dry run passed | Final candidate verification and post-publication Homebrew/apt checks |
 
@@ -486,19 +498,13 @@ evidence of a live pass until its recorded run completes.
    live run. Preserve both. The failure was a test-placement error, not proof
    of invalid credentials or a broken thirty-second deadline. Run the targeted
    regression tests and required CI before integrating the qualification tools.
-2. **Complete the macOS live observation check.** The checked-in signed
-   instrumented build now passes synchronized synthetic worker observation.
-   Run its live mode to add successful real-account launch observations. Keep
-   those checkpoints distinct from unmodified candidate sampling; never weaken
-   the deployed binary's signing protections or claim universal coverage.
-3. **Decide macOS network-timeout scope.** Linux now has actual candidate and
-   instrumented SDK stall evidence at both deadlines, with verified TLS and
-   restored-network controls. For equivalent macOS evidence, adapt the verified
-   per-process forwarding path, verify that candidate SDK traffic actually uses
-   it, and retain timing, child-marker and cleanup checks without changing the
-   shared host firewall. If qualification relies on the shared SDK/transport
-   implementation instead, explicitly approve and record that platform limit;
-   do not claim a macOS network-stall pass from Linux results.
+2. **Retain the completed macOS live observation evidence.** Five live workers
+   passed synchronized checks. Keep these instrumented checkpoints distinct
+   from unmodified candidate sampling; do not claim universal coverage.
+3. **Retain the completed macOS network-timeout evidence.** Candidate and
+   instrumented SDK stalls passed with pending-network evidence, restored-network
+   controls, and verified cleanup. No additional live repetition is required
+   unless relevant code, packaging, or unresolved findings justify it.
 4. **Decide the bounded lookup outcome.** The planned twenty-read matrix passed
    on each platform. No further broad repetitions are required without a new
    failure. Historical intermittency remains unexplained: document that fact
