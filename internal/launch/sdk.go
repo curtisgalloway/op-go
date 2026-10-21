@@ -10,8 +10,11 @@ import (
 	"runtime"
 )
 
+// IntegrationVersion is reported to 1Password; the CLI sets it to its build version.
+var IntegrationVersion = "dev"
+
 func newSDKResolver(ctx context.Context, token string) (resolver, error) {
-	client, err := onepassword.NewClient(ctx, onepassword.WithServiceAccountToken(token), onepassword.WithIntegrationInfo("op-go", "0.1.0-dev"))
+	client, err := onepassword.NewClient(ctx, onepassword.WithServiceAccountToken(token), onepassword.WithIntegrationInfo("op-go", IntegrationVersion))
 	if err != nil {
 		return nil, err
 	}

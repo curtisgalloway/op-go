@@ -76,6 +76,7 @@ type dependencies struct {
 
 // Run executes the CLI. Successful run replaces this process with the target.
 func Run(args []string, stdout, stderr io.Writer) int {
+	launch.IntegrationVersion = Version
 	return run(args, stdout, stderr, dependencies{
 		open: store.Open, lookup: os.LookupEnv, input: os.Stdin,
 		terminal: term.IsTerminal(int(os.Stdin.Fd())),

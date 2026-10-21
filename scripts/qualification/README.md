@@ -77,6 +77,21 @@ operation. Use a new report filename and the same dedicated test account.
 A direct success narrows the difference to the forwarded path; a direct failure
 requires account/SDK investigation before further authenticated attempts.
 
+`--live --package-upgrade` checks the notarized release binary against an
+enrollment made by a locally signed development build. Pass the development
+build as `--baseline` and the executable extracted from the release candidate's
+archive as `--binary`; the archive, disk image and Homebrew bottle carry
+identical bytes, so one check covers all three. The run requires the candidate
+to pass Gatekeeper as notarized Developer ID with the same designated
+requirement as the baseline, enrolls with the baseline at op-go's hidden prompt,
+then requires exact delivery after a same-path replacement and from a new
+Homebrew-style versioned path, without re-enrollment. It uses no proxy and
+repeats neither the lookup matrix nor network stalls.
+
+```sh
+python3 scripts/qualification/run_macos.py --live --package-upgrade --baseline release-logs/qualification-build/candidate --binary release-logs/dry-run-RUN/notarized/op-go-X.Y.Z/op-go --instrumented release-logs/qualification-build/instrumented --probe release-logs/qualification-build/probe --report release-logs/macos-package-upgrade.json
+```
+
 The macOS observer reads arguments/environments with `ps` at synchronized
 checkpoints; it rejects failed reads instead of treating them as clean evidence.
 Coverage applies to those processes and checkpoints, not arbitrary memory or

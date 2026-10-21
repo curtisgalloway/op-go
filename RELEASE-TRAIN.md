@@ -10,7 +10,7 @@ Homebrew tap is a repository of package recipes; a bottle is a prebuilt package.
 An apt repository provides signed Debian package indexes for installation and
 upgrades. Notarization is Apple's check of signed software. See [GLOSSARY.md](GLOSSARY.md).
 
-Derived from commit 73d338d on 2026-10-20. Executed by the release-train skill;
+Derived from commit c9b6e8b on 2026-10-20. Executed by the release-train skill;
 checked by `scripts/check-release-profile.py`. UNVERIFIED means the specified
 distribution path has not completed its full qualification yet.
 
@@ -86,7 +86,7 @@ The self-invoked credential worker is the bundled helper exercised by S3.
 - install like a user: extract into a temporary directory and copy executable into a temporary bin directory
 - smoke: S1..S5 on both architectures; signed offline SDK validator on both architectures; verify signature
 - cleanup: remove extracted candidate and temporary signing keychain
-- caveats: UNVERIFIED full Apple notarization dry run and native Intel execution; standalone executables cannot carry a stapled ticket, so archives rely on Apple's online ticket lookup
+- caveats: notarization and native Intel execution passed in release dry runs; standalone executables cannot carry a stapled ticket, so archives rely on Apple's online ticket lookup
 
 ### macos-disk-image
 
@@ -98,7 +98,7 @@ The self-invoked credential worker is the bundled helper exercised by S3.
 - install like a user: mount disk image read-only, copy executable to a disposable prefix, unmount
 - smoke: S1..S5 on the copied executable; stapler validate; Gatekeeper disk-image assessment
 - cleanup: unmount on success or failure; remove temporary copy
-- caveats: UNVERIFIED full notarization and mounted-image install; credentials are not yet provisioned
+- caveats: notarization, stapling and mounted-image install passed in release dry runs
 
 ### homebrew
 
@@ -110,7 +110,7 @@ The self-invoked credential worker is the bundled helper exercised by S3.
 - install like a user: brew install --force-bottle from a temporary tap on disposable runners; formula URLs point at local candidate assets before publication
 - smoke: S1..S5 plus brew test; execute both macOS slices and both native Linux builds
 - cleanup: discard the runner or container and its temporary tap/keg
-- caveats: UNVERIFIED complete four-runner Homebrew matrix; tap integration must be merged before the first dry run
+- caveats: four-runner bottle matrix passed in release dry runs; UNVERIFIED published tap dispatch and formula until the first stable tag
 
 ### debian
 
@@ -171,5 +171,5 @@ The self-invoked credential worker is the bundled helper exercised by S3.
 | `packaging/scripts/test_apt.py` | 7d62a4dcc344 | Channels: apt |
 | `scripts/smoke-release.py` | 070182aabddb | Smoke contract |
 | `go.mod` | fc0b1b8b50a6 | Hosts, Archaeology |
-| `README.md` | bc4a40d217bd | Channels |
-| `RELEASING.md` | 398d59d8692e | Publish |
+| `README.md` | b383ef56f7b2 | Channels |
+| `RELEASING.md` | 92d7751e6d8d | Publish |

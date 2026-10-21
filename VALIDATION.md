@@ -4,11 +4,11 @@
 system libraries. D-Bus is the local messaging protocol used by Linux Secret
 Service. See [GLOSSARY.md](GLOSSARY.md).
 
-This development implementation has automated evidence for its command and
-credential-transport behavior, dedicated-account checks on macOS and Linux,
-and a user-operated macOS signed-build upgrade check. It has not completed
-signed-release qualification. Results apply to the tested builds, operating
-systems, and credential stores, not every supported platform.
+op-go has automated evidence for its command and credential-transport behavior,
+dedicated-account checks on macOS and Linux, a signed development-build upgrade
+check, and a release-workflow dry run of every distribution channel. Results
+apply to the tested builds, operating systems, and credential stores, not every
+supported platform.
 
 ## Observed checks
 
@@ -287,6 +287,39 @@ systems, and credential stores, not every supported platform.
   native Intel macOS execution of the signed SDK validator. Publication jobs
   were skipped, as a dry run requires. The published apt site and automated tap
   dispatch remain unverified until the first tagged release.
+- On 2026-10-21 a second release dry run (run
+  [39626392560](https://github.com/curtisgalloway/op-go/actions/runs/39626392560),
+  version 0.1.0, merged commit `450cb64`) concluded successfully. Apple
+  notarization returned Accepted; signing, mounted disk-image installation,
+  both Linux package builds, both apt installation jobs, and all four native
+  Homebrew jobs passed. Publication jobs were skipped as a manual dispatch
+  requires. All nine downloaded artifacts matched their checksum sidecars. The
+  macOS archive, disk image and Homebrew bottle contain byte-identical
+  executables (SHA-256
+  `9fb0e3d9de0f8d0124bdf26fbea360aba5097a9c7ec3a26f55be57f5941d6d8f`) that
+  Gatekeeper assesses as notarized Developer ID, with the same designated
+  requirement as the local signed builds. One reporting quirk: the GitHub job
+  API still listed the amd64 apt job as in progress after every one of its
+  steps had passed and the workflow had completed.
+- The notarized-package upgrade check (`run_macos.py --live --package-upgrade`)
+  failed twice on 2026-10-21 against that dry-run executable, and the failure
+  blocked the release. Gatekeeper, designated-requirement, hidden enrollment and
+  baseline delivery checks passed, including an immediate repeat of the baseline
+  delivery. The notarized executable then returned status 3 after about 3.2
+  seconds with the sanitized diagnostic "cannot execute command": its token
+  read and secret resolution had succeeded, and it failed before exec. The
+  cause was a release-toolchain difference, not Keychain trust. CI builds with
+  Go 1.26.10 (the go.mod version); every live-qualified local build used Go
+  1.27.3. Under Go 1.26.10, listing `/dev/fd` with `os.ReadDir` stats each
+  entry, and after network use the runtime's network-poller descriptor is
+  listed but cannot be stat'ed (EBADF). This reproduced offline with a fake
+  token, and a regression test that starts the network poller before replacing
+  the process fails without the fix under Go 1.26.10. The launcher now lists
+  descriptor names without stat; tests pass under both toolchains. The release
+  smoke contract could not detect this, because its fake token fails before
+  any exec that follows network use. Both failure reports are preserved
+  locally. A rebuilt candidate must pass the package-upgrade check before
+  publication.
 - Native macOS 27.0.1 arm64 checks with Go 1.27.2 passed for `9b8ebf6`:
   normal and race tests, formatting, vet, build, and the pinned vulnerability
   scan. CLI smoke checks passed for JSON output, literal environment delivery,
@@ -483,8 +516,8 @@ CI uses a private D-Bus instance and fake values. No real 1Password account is n
 | Store timeout | Stopped real Linux keyring daemon; status 20 after about five seconds | Separate from SDK network timeout |
 | Process exposure | Linux synchronized synthetic/live checks; macOS synchronized synthetic/live worker checks | Instrumentation does not establish universal candidate coverage |
 | SDK network timeout | Linux live candidate deadlines at 30.048/5.023 seconds; macOS live candidate deadlines at 30.037/5.047 seconds; separate instrumented initialization/resolution checks and recovery passed on both platforms | Coverage applies to the tested builds and forwarding setup |
-| Name/ID lookups | All 20 source-pinned matrix reads passed on each platform | Historical intermittency not reproduced; explicit residual-risk decision required |
-| Distribution | Signing/notarization and native four-platform install dry run passed | Final candidate verification and post-publication Homebrew/apt checks |
+| Name/ID lookups | All 20 source-pinned matrix reads passed on each platform | Closed: the maintainer attributes the earlier failures to operator error. Documentation recommends IDs; names remain supported |
+| Distribution | Signing/notarization and native four-platform install dry runs passed; notarized-package upgrade found and fixed an exec failure on the Go 1.26.10 release toolchain | Package-upgrade check on a rebuilt candidate; post-publication Homebrew/apt checks |
 
 ### Recommended order for closing the gaps
 
@@ -505,14 +538,14 @@ evidence of a live pass until its recorded run completes.
    instrumented SDK stalls passed with pending-network evidence, restored-network
    controls, and verified cleanup. No additional live repetition is required
    unless relevant code, packaging, or unresolved findings justify it.
-4. **Decide the bounded lookup outcome.** The planned twenty-read matrix passed
-   on each platform. No further broad repetitions are required without a new
-   failure. Historical intermittency remains unexplained: document that fact
-   and obtain an explicit release decision rather than declaring a fix or
-   claiming IDs eliminate the issue. Preserve sanitized error categories if
-   a future run reproduces it; do not automatically retry authentication errors.
+4. **Lookup outcome: decided.** The twenty-read matrix passed on each platform.
+   On 2026-10-21 the maintainer attributed the earlier failures to operator
+   error and chose to recommend IDs in user documentation while keeping names
+   supported. If a lookup failure recurs, preserve its sanitized error category
+   and reopen this item; do not automatically retry authentication errors.
 5. **Verify the final distribution artifacts.** Carry the source-pinned macOS
-   development-build upgrade check forward to the notarized candidate packages.
+   development-build upgrade check forward to the notarized candidate packages
+   with `run_macos.py --live --package-upgrade`.
    Keep support claims limited to qualified OS/provider combinations. Re-run
    candidate build/install checks if code or packaging changes. After approval
    and publication, verify the tap update and apt deployment, then install the
