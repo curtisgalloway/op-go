@@ -115,7 +115,13 @@ class MacQualification(Qualification):
             "checks": [],
             "operations": [],
             "cleanup": False,
-            "mode": "live" if args.live else "synthetic",
+            "mode": (
+                "package-upgrade"
+                if args.package_upgrade
+                else "live"
+                if args.live
+                else "synthetic"
+            ),
             "temporary_store": str(self.root),
             "binary_sha256": hashlib.sha256(args.binary.read_bytes()).hexdigest(),
             "instrumented_sha256": hashlib.sha256(
@@ -135,7 +141,11 @@ class MacQualification(Qualification):
         self.observer.process_getter = lambda: self.active
         self.observer.token = b"" if self.args.live else self.token
         self.env["OP_GO_QUALIFICATION_SOCKET"] = str(self.observer.path)
-        if self.args.live and not self.args.direct_control:
+        if (
+            self.args.live
+            and not self.args.direct_control
+            and not self.args.package_upgrade
+        ):
             self.relay = Relay(
                 self.root / "relay", self.root / "mode", self.root / "stats"
             )
@@ -351,7 +361,90 @@ class MacQualification(Qualification):
         finally:
             self.args.binary = original
 
+    def signing(self, binary):
+        """Return the designated requirement, which Keychain trust is keyed on."""
+        result = subprocess.run(
+            ["/usr/bin/codesign", "-d", "-r-", str(binary)],
+            capture_output=True,
+            timeout=15,
+            check=False,
+        )
+        lines = (result.stdout + result.stderr).decode().splitlines()
+        return [line for line in lines if line.startswith("designated =>")]
+
+    def package_upgrade(self):
+        """Enroll with the signed development build, then run the notarized bytes.
+
+        Covers same-path replacement (archive or disk image copied over the old
+        executable) and a new path (Homebrew installs each version in its own
+        Cellar directory). No proxy, lookup matrix, or network stall is repeated.
+        """
+        candidate = self.args.binary
+        baseline = self.args.baseline
+        self.report["baseline_sha256"] = hashlib.sha256(
+            baseline.read_bytes()
+        ).hexdigest()
+        assessment = subprocess.run(
+            ["/usr/sbin/spctl", "--assess", "-vv", "--type", "install", candidate],
+            capture_output=True,
+            timeout=60,
+            check=False,
+        )
+        self.record(
+            "candidate notarized Developer ID",
+            assessment.returncode == 0
+            and b"source=Notarized Developer ID" in assessment.stderr,
+        )
+        self.record(
+            "baseline not notarized-identical",
+            baseline.read_bytes() != candidate.read_bytes(),
+        )
+        designated = self.signing(candidate)
+        self.record(
+            "same designated requirement",
+            bool(designated) and designated == self.signing(baseline),
+        )
+        installed = self.root / "prefix" / "bin" / "op-go"
+        installed.parent.mkdir(parents=True)
+        shutil.copy2(baseline, installed)
+        self.args.binary = installed
+        print("Enter the dedicated TEST token at op-go's hidden prompt.", flush=True)
+        socket_path = self.env.pop("OP_GO_QUALIFICATION_SOCKET")
+        try:
+            self.cli("hidden baseline enrollment", ["enroll"], terminal=True, limit=300)
+        finally:
+            self.env["OP_GO_QUALIFICATION_SOCKET"] = socket_path
+        self.load_observer_token()
+        self.env.update(OP_CONNECT_TOKEN="fake", OP_SESSION_TEST="fake")
+        refs = self.root / "upgrade.env"
+        refs.write_text("TEST_VALUE=op://Test Vault/API Credentials/username\n")
+        marker = self.root / "upgrade-child"
+        run = ["run", "--env-file", refs, "--", *self.target(marker)]
+        self.cli("baseline live delivery", run, limit=45)
+        shutil.copy2(candidate, installed)
+        self.cli("notarized same-path upgrade delivery", run, limit=45)
+        cellar = self.root / "Cellar" / "op-go" / "0.1.0" / "bin" / "op-go"
+        cellar.parent.mkdir(parents=True)
+        shutil.copy2(candidate, cellar)
+        self.args.binary = cellar
+        self.cli("notarized new-path delivery", run, limit=45)
+        self.cli("notarized metadata", ["doctor", "--json"])
+        self.record(
+            "upgrade no trust repair",
+            input(
+                "No permission prompt or trust repair appeared after either "
+                "upgrade? Type yes: "
+            ).strip()
+            == "yes",
+        )
+        self.cli("notarized enrollment removal", ["remove", "--yes"])
+        self.cli("notarized absence", ["doctor", "--json"], expected=3)
+        self.args.binary = candidate
+
     def live(self):
+        if self.args.package_upgrade:
+            self.package_upgrade()
+            return
         original = self.args.binary
         if not (self.args.network_only or self.args.direct_control):
             baseline = self.args.baseline or (original.parent / "baseline")
@@ -499,6 +592,11 @@ def main():
         action="store_true",
         help="one live exact-value check without the proxy; stops on failure",
     )
+    parser.add_argument(
+        "--package-upgrade",
+        action="store_true",
+        help="enroll with --baseline, then deliver with the notarized --binary",
+    )
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--synthetic", action="store_true")
     mode.add_argument("--live", action="store_true")
@@ -520,6 +618,12 @@ def main():
         parser.error("live checks require a terminal")
     if args.direct_control and (not args.live or args.network_only):
         parser.error("--direct-control requires --live and cannot use --network-only")
+    if args.package_upgrade:
+        if not args.live or args.network_only or args.direct_control:
+            parser.error("--package-upgrade requires --live alone")
+        if not args.baseline:
+            parser.error("--package-upgrade requires --baseline")
+        args.baseline = args.baseline.resolve()
     os.umask(0o077)
     print(
         "Temporarily switching the default Keychain.\n"
@@ -532,7 +636,9 @@ def main():
         and input("Type yes to continue: ").strip() != "yes"
     ):
         return 1
-    for binary in (args.binary, args.instrumented, args.probe):
+    for binary in (args.binary, args.instrumented, args.probe, args.baseline):
+        if binary is None:
+            continue
         subprocess.run(
             ["/usr/bin/codesign", "--verify", "--strict", binary], check=True
         )

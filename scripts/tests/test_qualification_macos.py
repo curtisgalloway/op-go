@@ -96,12 +96,18 @@ class DirectControlTests(unittest.TestCase):
     """The requested comparison cannot accidentally enable proxy or fake resolution."""
 
     def test_direct_control_uses_neither_proxy_nor_synthetic_resolver(self):
+        self.assert_no_proxy(direct_control=True, package_upgrade=False)
+
+    def test_package_upgrade_uses_neither_proxy_nor_synthetic_resolver(self):
+        self.assert_no_proxy(direct_control=False, package_upgrade=True)
+
+    def assert_no_proxy(self, **modes):
         with tempfile.TemporaryDirectory() as directory:
             args = SimpleNamespace(
                 binary=Path(sys.executable),
                 instrumented=Path(sys.executable),
                 live=True,
-                direct_control=True,
+                **modes,
             )
             with patch.object(MAC.tempfile, "mkdtemp", return_value=directory):
                 q = MAC.MacQualification(args)
