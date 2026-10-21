@@ -301,6 +301,25 @@ supported platform.
   requirement as the local signed builds. One reporting quirk: the GitHub job
   API still listed the amd64 apt job as in progress after every one of its
   steps had passed and the workflow had completed.
+- The notarized-package upgrade check (`run_macos.py --live --package-upgrade`)
+  failed twice on 2026-10-21 against that dry-run executable, and the failure
+  blocked the release. Gatekeeper, designated-requirement, hidden enrollment and
+  baseline delivery checks passed, including an immediate repeat of the baseline
+  delivery. The notarized executable then returned status 3 after about 3.2
+  seconds with the sanitized diagnostic "cannot execute command": its token
+  read and secret resolution had succeeded, and it failed before exec. The
+  cause was a release-toolchain difference, not Keychain trust. CI builds with
+  Go 1.26.10 (the go.mod version); every live-qualified local build used Go
+  1.27.3. Under Go 1.26.10, listing `/dev/fd` with `os.ReadDir` stats each
+  entry, and after network use the runtime's network-poller descriptor is
+  listed but cannot be stat'ed (EBADF). This reproduced offline with a fake
+  token, and a regression test that starts the network poller before replacing
+  the process fails without the fix under Go 1.26.10. The launcher now lists
+  descriptor names without stat; tests pass under both toolchains. The release
+  smoke contract could not detect this, because its fake token fails before
+  any exec that follows network use. Both failure reports are preserved
+  locally. A rebuilt candidate must pass the package-upgrade check before
+  publication.
 - Native macOS 27.0.1 arm64 checks with Go 1.27.2 passed for `9b8ebf6`:
   normal and race tests, formatting, vet, build, and the pinned vulnerability
   scan. CLI smoke checks passed for JSON output, literal environment delivery,
@@ -498,7 +517,7 @@ CI uses a private D-Bus instance and fake values. No real 1Password account is n
 | Process exposure | Linux synchronized synthetic/live checks; macOS synchronized synthetic/live worker checks | Instrumentation does not establish universal candidate coverage |
 | SDK network timeout | Linux live candidate deadlines at 30.048/5.023 seconds; macOS live candidate deadlines at 30.037/5.047 seconds; separate instrumented initialization/resolution checks and recovery passed on both platforms | Coverage applies to the tested builds and forwarding setup |
 | Name/ID lookups | All 20 source-pinned matrix reads passed on each platform | Closed: the maintainer attributes the earlier failures to operator error. Documentation recommends IDs; names remain supported |
-| Distribution | Signing/notarization and native four-platform install dry runs passed | Notarized-package upgrade check; post-publication Homebrew/apt checks |
+| Distribution | Signing/notarization and native four-platform install dry runs passed; notarized-package upgrade found and fixed an exec failure on the Go 1.26.10 release toolchain | Package-upgrade check on a rebuilt candidate; post-publication Homebrew/apt checks |
 
 ### Recommended order for closing the gaps
 
