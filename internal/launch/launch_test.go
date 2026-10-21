@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -154,8 +156,32 @@ func TestExecProcessHelper(t *testing.T) {
 		if err := replace("/bin/sh", []string{"sh", "-c", "kill -TERM $$"}, []string{}); err != nil {
 			os.Exit(98)
 		}
+	} else if mode == "network" {
+		// SDK resolution starts Go's network poller. On macOS its kqueue appears in
+		// /dev/fd but cannot be stat'ed, which broke exec after every live lookup.
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			os.Exit(95)
+		}
+		defer listener.Close()
+		if err := replace("/bin/sh", []string{"sh", "-c", "exit 42"}, []string{}); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(98)
+		}
 	}
 	os.Exit(99)
+}
+
+func TestExecAfterNetworkUse(t *testing.T) {
+	cmd := exec.Command(os.Args[0], "-test.run=^TestExecProcessHelper$")
+	cmd.Env = []string{"OP_GO_TEST_EXEC=1", "OP_GO_TEST_MODE=network"}
+	var out bytes.Buffer
+	cmd.Stderr = &out
+	err := cmd.Run()
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) || exit.ExitCode() != 42 {
+		t.Fatalf("exit=%v stderr=%s", err, out.String())
+	}
 }
 func TestExecPreservesExitSignalAndClosesDescriptors(t *testing.T) {
 	f, err := os.CreateTemp(t.TempDir(), "fd")
