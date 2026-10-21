@@ -11,6 +11,40 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
 
 ## Observed checks
 
+- Linux follow-up qualification uses clean merge
+  `f3d46f2391cec2147ca1d14633a6fc8b7d7accaa`, matching the coordinated macOS
+  source, with Go 1.26.10, Ubuntu 26.04.1 amd64, and GNOME Keyring 50.0. The
+  candidate embeds that full commit and UTC source date `2026-10-21T02:13:50Z`;
+  its SHA-256 is
+  `9691a63ffbfb2a624a99c2a7db438effa739137ebc33d25eb3fb2b95c5558896`.
+  Automatic Go VCS discovery encountered a non-repository ancestor in the
+  isolated-worktree environment, so the build disabled automatic VCS stamping
+  and used the release script's explicit, independently checked linker metadata.
+  Installed binaries were preserved. The existing real-keyring harness passed
+  its synthetic lifecycle and private-policy denial runs on this unmodified
+  candidate, including locked status 11, denied status 12, actual stalled-store
+  timeout, terminal restoration, and cleanup. The offline CLI smoke contract
+  and release-profile consistency check also passed.
+- The opt-in tools in `scripts/qualification/` add private network forwarding,
+  a bounded lookup matrix, and synchronized process checkpoints. The pinned
+  SDK transport was inspected: Extism v1.7.1 sends context-bound requests through
+  Go's default HTTP client. An approved disposable network namespace containing
+  only loopback reached HTTPS through the private Unix-socket relay with
+  certificate verification enabled. This credential-free preflight proves the
+  isolation/forwarding setup, not an actual SDK network timeout.
+- A separate instrumented build, created through a source overlay, passed
+  hidden-terminal and piped synthetic enrollment, replacement, retrieval, and
+  successful launch using an explicitly enabled synthetic resolver fixture. All 35 instrumented
+  credential workers were correlated with request/result checkpoints or,
+  for one deliberately canceled worker, a request checkpoint and confirmed
+  exit. The observer found no synthetic token in the inspected arguments or
+  environments; no raw process data was recorded. This covers those synchronized
+  phases of the instrumented build, not every instant or every worker of the
+  unmodified candidate. The temporary keyring and private daemons were cleaned up.
+  Normal/race Go tests, vet, and pinned vulnerability scanning passed. Script
+  tests passed except for the apt-repository test, skipped because its tools were
+  unavailable. Actual SDK stalls, live lookup comparisons, and live observation
+  on the new candidate await local credential entry.
 - PR #6 CI subsequently reported reachable standard-library vulnerability
   `GO-2026-6809` in Go 1.26.9 on both native platforms: compromised intermediate
   certificates in `crypto/x509`. The minimum Go version is now 1.26.10, the
