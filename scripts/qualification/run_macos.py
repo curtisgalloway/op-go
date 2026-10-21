@@ -256,6 +256,11 @@ class MacQualification(Qualification):
             output_token_exposure=exposed,
             relay_counters=self.stats(),
         )
+        if process.returncode != expected and not exposed and not terminal:
+            # Launcher diagnostics are sanitized by design; keep the last line
+            # so a failure records its error category, never raw SDK text.
+            lines = (err or b"").decode(errors="replace").strip().splitlines()
+            operation["diagnostic"] = lines[-1][:200] if lines else ""
         self.report["operations"].append(operation)
         # Record evidence before raising so failed stalls retain diagnostics.
         self.record(
@@ -421,6 +426,8 @@ class MacQualification(Qualification):
         marker = self.root / "upgrade-child"
         run = ["run", "--env-file", refs, "--", *self.target(marker)]
         self.cli("baseline live delivery", run, limit=45)
+        # Back-to-back control: a failure here is a lookup problem, not upgrade trust.
+        self.cli("baseline immediate repeat delivery", run, limit=45)
         shutil.copy2(candidate, installed)
         self.cli("notarized same-path upgrade delivery", run, limit=45)
         cellar = self.root / "Cellar" / "op-go" / "0.1.0" / "bin" / "op-go"
