@@ -30,10 +30,17 @@ systems, and credential stores, not every supported platform.
   Product source, dependencies, and signing scripts are unchanged between the
   earlier successful source `f3d46f2` and this build's source `071cbe5`.
   Failure without forwarding rules out the qualification proxy as a necessary
-  cause, but does not identify the initialization error. Account/token state,
-  SDK behavior, and environmental differences remain unresolved. No automatic
-  authentication retry was performed. Verify the dedicated account/token state
-  before another live attempt; do not treat status 10 as proof of revocation.
+  cause, but did not identify the initialization error. No automatic
+  authentication retry was performed.
+- The operator subsequently confirmed the test token had expired. With a renewed
+  token, the same candidate passed the direct control on October 21, 2026:
+  all 14 recorded checks passed, including exact-value delivery in 3.621 seconds,
+  output redaction, the child-after-exec checkpoint, enrollment removal, and
+  missing-enrollment status 3. Cleanup succeeded with no reported errors or
+  surviving observed processes. This supports expired credentials as the cause
+  of the preceding initialization failures. The direct run observed no credential
+  workers and does not expand process coverage or qualify network stalls;
+  the live network checks remain outstanding.
 - The checked-in macOS qualification runner was exercised from build source
   `071cbe5` with Go 1.27.3. Its synthetic run passed all 62 recorded checks,
   including hidden terminal enrollment and echo restoration, piped replacement,
