@@ -1,6 +1,6 @@
 module github.com/curtisgalloway/op-go
 
-go 1.26.9
+go 1.26.10
 
 require (
 	github.com/1password/onepassword-sdk-go v0.4.1

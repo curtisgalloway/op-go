@@ -61,7 +61,7 @@ each with a checksum sidecar (a file containing its SHA-256 digest). See the
 
 ## Build
 
-Requires Go 1.26.9 or newer. macOS Keychain support also requires Apple's command-line
+Requires Go 1.26.10 or newer. macOS Keychain support also requires Apple's command-line
 developer tools and cgo (enabled by default for native Go builds). From the
 repository root:
 

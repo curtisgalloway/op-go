@@ -11,6 +11,69 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
 
 ## Observed checks
 
+- PR #6 CI subsequently reported reachable standard-library vulnerability
+  `GO-2026-6809` in Go 1.26.9 on both native platforms: compromised intermediate
+  certificates in `crypto/x509`. The minimum Go version is now 1.26.10, the
+  scanner's reported fixed version. The pinned govulncheck v1.9.0 scan with
+  Go 1.26.10 returned no vulnerabilities locally. Race tests, vet, a native
+  build, the offline CLI smoke contract, and the release-profile check passed. Earlier
+  real-keyring results below remain evidence for their recorded Go 1.26.9
+  candidate; they do not qualify a rebuilt release candidate automatically.
+- On 2026-10-20, a clean-source Linux amd64 candidate from
+  `27de464d7f1f4db40154c2d65abc1daa4ec1d5d2` built with Go 1.26.9 and
+  cgo disabled passed real GNOME Keyring 50.0 checks on Ubuntu 26.04.1.
+  Its SHA-256 was
+  `e031b0aa61c3e643cdee2a2b738bda0476e94aecd8cbfcfdc298a3dd84188087`.
+  The existing binary reported base revision `9f760f63abb5` with modified
+  source, so a separate candidate was built without replacing it. The desktop
+  enrollment was inspected as metadata only and left unchanged.
+  `scripts/validate-linux-real.py` used private D-Bus sessions and disposable
+  real keyrings. Synthetic enrollment, metadata, retrieval reaching expected SDK
+  authentication refusal (10), removal, and missing enrollment (3) passed.
+  Locked doctor and run returned 11 in under 0.01 seconds without child execution.
+  One wrong password returned 11 without retry; a separate correct attempt
+  unlocked. SIGINT, SIGTERM, and SIGHUP at the hidden unlock prompt restored echo.
+  A private bus policy denying GetSecret returned 12 without child execution.
+  Both runs stopped their private services and deleted their temporary stores.
+- In that run, stopping the real keyring daemon with SIGSTOP caused a pending
+  doctor operation to return 20 after 5.004 seconds; the daemon was then resumed.
+  This exercises an actual stalled store request at the normal five-second
+  deadline, not a tiny configured timeout. It does **not** qualify a stalled
+  1Password network request. Synthetic-token process-tree sampling found no token
+  in sampled arguments/environments during enrollment and failed retrieval/launch;
+  no process dumps were emitted. Sampling is not exhaustive, does not cover
+  hidden live enrollment or successful live launch, and does not prove every
+  short-lived worker was observed. No graphical display was configured for these
+  private sessions; desktop prompt behavior was not tested by this run.
+  Normal Go tests and vet passed.
+- A subsequent user-operated run of the same candidate passed hidden enrollment,
+  metadata inspection, and exact delivery of the dedicated test account's harmless
+  value into a child, with authentication variables absent. The run seeded
+  `OP_CONNECT_TOKEN` and `OP_SESSION_TEST` with harmless values and started without
+  `OP_SERVICE_ACCOUNT_TOKEN`. At the decline-overwrite step the user entered
+  `yes` instead of `no`; replacement returned 0, while the runner expected 2 and
+  stopped. This is a test-input mismatch, not evidence of a consent defect.
+  Post-replacement delivery, decline preservation, post-unlock live delivery,
+  and interactive removal consent remain untested in this run. Cleanup completed:
+  the disposable keyring was deleted and its private services stopped; the
+  desktop enrollment was unchanged.
+- A second user-operated run completed all 28 recorded live checks for that
+  candidate on the same GNOME Keyring version. Hidden enrollment and metadata,
+  exact dedicated-test-value delivery, and authentication-variable filtering
+  passed. Declining overwrite returned 2 and preserved live delivery; approved
+  replacement returned 0 and subsequent delivery passed. Locked doctor and run
+  returned 11 in 0.006 and 0.005 seconds respectively, without child execution.
+  One incorrect disposable keyring password returned 11 without retry; a separate
+  correct attempt unlocked and live delivery passed again. The password was
+  generated in memory and supplied through op-go's hidden terminal prompt; the
+  desktop password was not used. Declining removal returned 2 and preserved
+  delivery; approved removal returned 0 and doctor then returned 3. A genuinely
+  stalled store request returned 20 after 5.009 seconds. All three interruption
+  checks restored terminal echo. The report recorded successful cleanup, and
+  subsequent inspection confirmed the temporary store and both private daemons
+  were absent. The first run's incomplete consent checks are thus covered by
+  this second run. Neither run qualifies desktop graphical prompt behavior or
+  a stalled SDK network request.
 - The release infrastructure was exercised locally with disposable candidates:
   a Developer ID-signed universal macOS binary passed signature verification,
   the signed offline SDK validator and the CLI smoke contract. Both Linux
@@ -218,17 +281,21 @@ CI uses a private D-Bus instance and fake values. No real 1Password account is n
 
 - Exercise dedicated test items in actual Keychain and Secret Service stores:
   enroll, read, overwrite, remove, locked-store refusal, and denial without prompts.
+  The Linux isolated GNOME Keyring 50.0 lifecycle and private-bus denial checks
+  above are complete; this does not qualify other providers or desktop GUI policy.
 - Verify Keychain item access with the chosen macOS signing identity and after an
   upgrade. The login-Keychain APIs used to disable interaction and check lock state
   compile but are deprecated by Apple; their behavior must be qualified on each
   supported macOS version.
-- Authenticate to 1Password with a dedicated, narrowly scoped test account and
-  resolve a dedicated test item. The live smoke check used an existing read-only
-  account and application item. Verify timeout behavior during a stalled request
-  and investigate the observed name/ID lookup failures.
+- Dedicated-account exact delivery is now verified on Linux. Verify SDK timeout
+  behavior during an actual stalled network request and investigate the earlier
+  name/ID lookup failures; the successful dedicated-item checks do not establish
+  their cause. Store-request timeout evidence is separate from SDK network evidence.
 - Inspect process arguments/environments during enrollment, retrieval, and launch
   with test sentinels on both operating systems. The macOS live launch sampling
-  above does not cover enrollment, every retrieval worker, or Linux inspection.
+  above does not cover enrollment or every retrieval worker. Linux synthetic
+  sampling covers enrollment and failed retrieval/launch, but hidden enrollment,
+  complete worker coverage, and successful launch need further targeted evidence.
 
 Real-store and real-account checks are intentionally separate from default tests
 and require explicit authorization. No credentials are embedded in examples,
