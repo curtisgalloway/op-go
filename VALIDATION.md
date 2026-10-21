@@ -65,7 +65,8 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
   keyring/relay cleanup and namespace-controller exit; subsequent inspection
   confirmed the temporary keyring and its private daemon PIDs were absent.
   The five-second SDK stall, restored-network control, and instrumented
-  resolution-stage stalls did not run and remain untested.
+  resolution-stage stalls did not run in that attempt; the separate retry below
+  supplies their evidence.
 - The relay now permits TLS negotiation before holding application replies;
   deadline/status assertions are unchanged. A credential-free local TLS transport
   reproduction measured the original behavior at 10.013 seconds with no completed
@@ -75,8 +76,29 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
   These are transport-fixture results, not SDK or real-account timeout evidence.
   Targeted framing/forwarding and failure-evidence regression tests passed. The
   harness now preserves attempt diagnostics before raising and supports a
-  network-only rerun without repeating the successful lookup matrix. A live
-  network-only rerun awaits fresh hidden local enrollment.
+  network-only rerun without repeating the successful lookup matrix.
+- The subsequent live network-only retry passed all 77 recorded checks against
+  the same unmodified candidate hash above. Actual pending application replies
+  were observed for each stall with TLS verification enabled. The candidate
+  returned status 20 at 30.048 seconds for its default deadline and 5.023 seconds
+  for `--timeout 5s`, within the unchanged 29.5–35 and 4.5–10-second bounds.
+  Exact-value controls before and after the stalls passed. The separate
+  instrumented build identified the first-network stall as SDK initialization
+  (status 20 at 5.023 seconds), and independently exercised secret resolution
+  after initialization (status 20 at 30.044 and 5.022 seconds). Its restored-network
+  exact-value control also passed. Every stall retained an absent child marker
+  and no surviving observed process; all five instrumented credential workers
+  had synchronized request/result observations and confirmed exit. No token
+  exposure was detected in the sampled arguments/environments, synchronized
+  checkpoints, or captured output. Uninstrumented process sampling remains
+  limited to observed processes and instants; it is not universal coverage.
+  Approved removal succeeded and doctor returned missing-enrollment status 3.
+  The report confirms isolated keyring/relay cleanup, namespace-controller exit,
+  and an unchanged host network namespace. Subsequent inspection found the
+  temporary store, private daemon PIDs, and all observed process PIDs absent.
+  The original failure report remains unchanged; the lookup matrix was not
+  repeated. These live SDK results are separate from the store-timeout and
+  credential-free transport-fixture results.
 - PR #6 CI subsequently reported reachable standard-library vulnerability
   `GO-2026-6809` in Go 1.26.9 on both native platforms: compromised intermediate
   certificates in `crypto/x509`. The minimum Go version is now 1.26.10, the
@@ -353,15 +375,20 @@ CI uses a private D-Bus instance and fake values. No real 1Password account is n
   upgrade. The login-Keychain APIs used to disable interaction and check lock state
   compile but are deprecated by Apple; their behavior must be qualified on each
   supported macOS version.
-- Dedicated-account exact delivery is now verified on Linux. Verify SDK timeout
-  behavior during an actual stalled network request and investigate the earlier
-  name/ID lookup failures; the successful dedicated-item checks do not establish
-  their cause. Store-request timeout evidence is separate from SDK network evidence.
+- Dedicated-account exact delivery and actual stalled SDK network requests now
+  pass on Linux, including default/custom deadlines, initialization and
+  resolution phases, and restored-network controls. The bounded twenty-read
+  name/ID investigation did not reproduce the historical lookup failures or
+  establish their cause. Record an explicit release decision on that unresolved
+  history. Store-request timeout evidence remains separate from SDK evidence.
 - Inspect process arguments/environments during enrollment, retrieval, and launch
   with test sentinels on both operating systems. The macOS live launch sampling
-  above does not cover enrollment or every retrieval worker. Linux synthetic
-  sampling covers enrollment and failed retrieval/launch, but hidden enrollment,
-  complete worker coverage, and successful launch need further targeted evidence.
+  above does not cover enrollment or every retrieval worker. Linux synchronized
+  instrumented checks now cover hidden/piped synthetic enrollment, replacement,
+  retrieval, every reported credential worker, and successful live launch as
+  described above. This does not establish universal exposure absence for an
+  uninstrumented release binary. Reconcile corresponding macOS evidence for the
+  selected release source and signed artifacts before qualification.
 
 Real-store and real-account checks are intentionally separate from default tests
 and require explicit authorization. No credentials are embedded in examples,
