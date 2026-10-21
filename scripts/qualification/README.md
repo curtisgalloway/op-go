@@ -60,6 +60,15 @@ v0.4.1 uses Extism v1.7.1, whose HTTP host function creates context-bound Go
 requests and calls `http.DefaultClient`. The default Go transport supports the
 per-process proxy environment used here. No host-wide proxy settings change.
 
+The relay permits TLS negotiation before holding application replies. It examines
+only client TLS record headers: TLS 1.3's first encrypted record carries Finished,
+while the next carries application traffic; TLS 1.2 exposes a distinct encrypted
+Finished record type. Record payloads are neither decoded nor logged. Framing
+tests include fragmented records. A separate credential-free Go transport probe
+uses verified local TLS and HTTP trace callbacks to verify that the handshake
+and request write finish before the stall. This avoids mistaking Go's built-in
+ten-second TLS handshake timeout for the launcher's total SDK deadline.
+
 The candidate first demonstrates successful exact-value delivery. Each stalled
 run must return 20 near the requested deadline, have an established outbound
 connection, forwarded client traffic and a held reply, and leave no child marker.
@@ -83,6 +92,11 @@ clean matrix means historical intermittency was not reproduced, not fixed.
 The live mode requires a local terminal for op-go's hidden prompts and reuses
 the enrollment/consent/lock/unlock/removal lifecycle in `validate-linux-real.py`.
 `--preflight` verifies the namespace proxy's HTTPS connectivity without credentials.
+`--network-only` performs fresh hidden enrollment, network controls/stalls, and
+removal without repeating the lookup matrix or consent lifecycle. Use a new
+report filename to preserve prior failure evidence. `check_transport.py` tests
+the old handshake-stall behavior and the repaired relay with a disposable local
+TLS server and no account credentials; those results are not SDK qualification.
 Provide candidate, instrumented, and probe binaries, a local nonsecret JSON file
 with `vault`/`item` IDs, and a private report path. Keep identifiers and local
 reports out of published artifacts. The dedicated field's expected value is the
@@ -94,6 +108,11 @@ relay/namespace cleanup evidence. Preserve reports alongside the build provenanc
 No process dumps, packet payloads, credential lengths, or token fingerprints are
 recorded. A normal failure stops testing and destroys only the temporary keyring;
 it never retries authentication or changes the desktop store.
+Each network attempt saves counters, child-marker state, expected/actual status,
+elapsed time, phase checkpoints, and surviving observed process IDs even when a
+status assertion fails. Sampling still cannot prove that an unobserved process
+never existed. TLS establishment uses verified certificates in both the fixture
+and live paths; the fixture trusts only its own disposable server certificate.
 
 SIGINT/SIGTERM/SIGHUP restore terminal settings and initiate cleanup. SIGKILL,
 power loss, or a controller failure can bypass cleanup. In that case, retain the

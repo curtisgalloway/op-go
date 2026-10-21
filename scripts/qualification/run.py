@@ -123,6 +123,25 @@ class Qualification(base.Validation):
             20: "operation-failed-or-timeout",
             23: "rate-limit",
         }.get(process.returncode, "other")
+        self.report.setdefault("operations", []).append(
+            {
+                "name": name,
+                "expected_status": expected,
+                "actual_status": process.returncode,
+                "seconds": round(elapsed, 3),
+                "category": category,
+                "observed_pids": sorted(observed),
+                "surviving_observed_pids": sorted(
+                    pid for pid in observed if Path("/proc", str(pid)).exists()
+                ),
+                "checkpoint_phases": sorted({e["phase"] for e in events}),
+                "sampled_token_exposure": bool(exposed),
+                "output_token_exposure": bool(
+                    self.observer.token
+                    and self.observer.token in (out or b"") + (err or b"")
+                ),
+            }
+        )
         self.record(
             name,
             (
@@ -302,7 +321,9 @@ class Qualification(base.Validation):
         return (
             json.loads(path.read_text())
             if path.exists()
-            else dict(connected=0, client_records=0, held_replies=0)
+            else dict(
+                connected=0, client_records=0, held_replies=0, application_connections=0
+            )
         )
 
     def additional_checks(self):
@@ -333,8 +354,49 @@ class Qualification(base.Validation):
         self.report["lookup_conclusion"] = (
             "historical intermittency not reproduced; not proven fixed"
         )
+        self.network_checks()
+
+    def stalled_run(self, name, args, timeout, marker):
+        """Retain attempt evidence even when the status assertion raises."""
+        before = self.stats()
+        event_start = len(self.observer.events)
+        try:
+            return self.cli(name, args, expected=20, limit=timeout + 10)
+        finally:
+            after = self.stats()
+            operation = next(
+                (
+                    v
+                    for v in reversed(self.report.get("operations", []))
+                    if v["name"] == name
+                ),
+                {},
+            )
+            self.report.setdefault("network_attempts", []).append(
+                {
+                    "name": name,
+                    "requested_deadline": timeout,
+                    "before": before,
+                    "after": after,
+                    "child_marker_present": marker.exists(),
+                    "checkpoint_phases": sorted(
+                        {e["phase"] for e in self.observer.events[event_start:]}
+                    ),
+                    "operation": operation,
+                }
+            )
+
+    def network_checks(self):
+        """Affected checks only; no lookup matrix or credential lifecycle replay."""
+        refs = self.root / "network.env"
+        marker = self.root / "network-child-marker"
 
         refs.write_text("TEST_VALUE=op://Test Vault/API Credentials/username\n")
+        self.cli(
+            "candidate pre-stall exact-value control",
+            ["run", "--env-file", refs, "--", *self.target(marker)],
+            limit=45,
+        )
         for timeout in (30, 5):
             marker.unlink(missing_ok=True)
             before = self.stats()
@@ -343,11 +405,11 @@ class Qualification(base.Validation):
                 args = ["run", "--env-file", refs]
                 if timeout != 30:
                     args += ["--timeout", f"{timeout}s"]
-                _, elapsed = self.cli(
+                _, elapsed = self.stalled_run(
                     f"candidate network stall {timeout}s",
                     [*args, "--", *self.target(marker)],
-                    expected=20,
-                    limit=timeout + 10,
+                    timeout,
+                    marker,
                 )
                 after = self.stats()
                 self.record(
@@ -355,6 +417,8 @@ class Qualification(base.Validation):
                     after["connected"] > before["connected"]
                     and after["client_records"] > before["client_records"]
                     and after["held_replies"] > before["held_replies"]
+                    and after["application_connections"]
+                    > before["application_connections"]
                     and not marker.exists()
                     and timeout - 0.5 <= elapsed <= timeout + 5,
                     phase="not instrumented; phase attribution requires separate probe",
@@ -380,7 +444,7 @@ class Qualification(base.Validation):
             marker.unlink(missing_ok=True)
             set_mode(self.shared / "mode", "stall")
             try:
-                self.cli(
+                self.stalled_run(
                     "instrumented first-network stall",
                     [
                         "run",
@@ -391,8 +455,8 @@ class Qualification(base.Validation):
                         "--",
                         *self.target(marker),
                     ],
-                    expected=20,
-                    limit=15,
+                    5,
+                    marker,
                 )
                 phases = {e["phase"] for e in self.observer.events[event_start:]}
                 self.report["first_network_stall_phase"] = (
@@ -406,7 +470,7 @@ class Qualification(base.Validation):
                 event_start = len(self.observer.events)
                 self.observer.stall_after_init = True
                 try:
-                    _, elapsed = self.cli(
+                    _, elapsed = self.stalled_run(
                         f"instrumented resolution stall {timeout}s",
                         [
                             "run",
@@ -417,8 +481,8 @@ class Qualification(base.Validation):
                             "--",
                             *self.target(marker),
                         ],
-                        expected=20,
-                        limit=timeout + 10,
+                        timeout,
+                        marker,
                     )
                     after = self.stats()
                     phases = {e["phase"] for e in self.observer.events[event_start:]}
@@ -458,6 +522,7 @@ def main():
     parser.add_argument("--inside", type=Path)
     parser.add_argument("--synthetic", action="store_true")
     parser.add_argument("--preflight", action="store_true")
+    parser.add_argument("--network-only", action="store_true")
     args = parser.parse_args()
     args.live, args.deny = not args.synthetic, False
     os.umask(0o077)
@@ -546,7 +611,28 @@ def main():
                 finally:
                     q.env.pop("OP_GO_QUALIFICATION_SYNTHETIC")
                 q.cli("synthetic cleanup", ["remove", "--yes"])
-            q.validate()
+            if args.network_only:
+                if args.synthetic:
+                    parser.error("--network-only needs live local enrollment")
+                q.report["lookup_matrix"] = "not repeated; prior 20 reads passed"
+                print(
+                    "Enter the dedicated token at the hidden prompt "
+                    "for network-only checks."
+                )
+                q.cli(
+                    "network-only hidden enrollment",
+                    ["enroll"],
+                    terminal=True,
+                    limit=300,
+                )
+                q.load_observer_token()
+                q.network_checks()
+                q.cli("network-only approved removal", ["remove", "--yes"])
+                q.cli(
+                    "network-only enrollment absent", ["doctor", "--json"], expected=3
+                )
+            else:
+                q.validate()
             events = q.observer.events
             workers = {e["child"] for e in events if e["phase"] == "worker-started"}
             requests = {

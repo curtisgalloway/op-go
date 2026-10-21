@@ -37,8 +37,22 @@ class RelayTest(unittest.TestCase):
                     server.settimeout(2)
                     client.sendall(b"CONNECT test.1password.com:443 HTTP/1.1\r\n\r\n")
                     self.assertIn(b"200 Connection Established", client.recv(1024))
-                    client.sendall(b"synthetic encrypted request")
-                    self.assertEqual(server.recv(1024), b"synthetic encrypted request")
+                    handshake = (
+                        b"\x16\x03\x03\x00\x01h"
+                        + b"\x14\x03\x03\x00\x01c"
+                        + b"\x17\x03\x03\x00\x01f"
+                    )
+                    client.sendall(handshake)
+                    self.assertEqual(
+                        server.recv(len(handshake), socket.MSG_WAITALL), handshake
+                    )
+                    server.sendall(b"synthetic handshake reply")
+                    self.assertEqual(client.recv(1024), b"synthetic handshake reply")
+                    application = b"\x17\x03\x03\x00\x01a"
+                    client.sendall(application)
+                    self.assertEqual(
+                        server.recv(len(application), socket.MSG_WAITALL), application
+                    )
                     server.sendall(b"synthetic encrypted response")
                     deadline = time.monotonic() + 2
                     while (
@@ -58,6 +72,21 @@ class RelayTest(unittest.TestCase):
                 client.close()
                 server.close()
             self.assertFalse((root / "relay").exists())
+
+    def test_fragmented_tls13_finished_does_not_arm_stall(self):
+        gate = NETWORK.TLSApplicationGate()
+        for byte in b"\x16\x03\x03\x00\x01h\x14\x03\x03\x00\x01c\x17\x03\x03\x00\x01f":
+            gate.feed(bytes([byte]))
+            self.assertFalse(gate.application_started)
+        gate.feed(b"\x17\x03\x03\x00\x01a")
+        self.assertTrue(gate.application_started)
+
+    def test_tls12_application_record_arms_stall(self):
+        gate = NETWORK.TLSApplicationGate()
+        gate.feed(b"\x16\x03\x03\x00\x01h\x14\x03\x03\x00\x01c\x16\x03\x03\x00\x01f")
+        self.assertFalse(gate.application_started)
+        gate.feed(b"\x17\x03\x03\x00\x01a")
+        self.assertTrue(gate.application_started)
 
     def test_unapproved_destination_never_connects(self):
         with tempfile.TemporaryDirectory() as directory:

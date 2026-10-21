@@ -17,15 +17,65 @@ def set_mode(path, mode):
     temporary.replace(path)
 
 
+class TLSApplicationGate:
+    """Recognize client application records from headers, without decrypting TLS.
+
+    Go's TLS 1.3 client emits its encrypted Finished in the first type-23 record;
+    application writes start with the second. TLS 1.2 sends encrypted Finished
+    as type 22 after ChangeCipherSpec, so its first type-23 record is application
+    data. Payloads are skipped, not decoded or retained by this classifier.
+    """
+
+    def __init__(self):
+        self.header = bytearray()
+        self.remaining = 0
+        self.ccs = False
+        self.tls12 = False
+        self.encrypted_records = 0
+        self.application_started = False
+
+    def feed(self, data):
+        offset = 0
+        while offset < len(data):
+            if self.remaining:
+                count = min(self.remaining, len(data) - offset)
+                self.remaining -= count
+                offset += count
+                continue
+            count = min(5 - len(self.header), len(data) - offset)
+            self.header.extend(data[offset : offset + count])
+            offset += count
+            if len(self.header) != 5:
+                continue
+            kind, major = self.header[:2]
+            if major != 3 or kind not in (20, 21, 22, 23):
+                raise ValueError("unsupported TLS framing")
+            self.remaining = int.from_bytes(self.header[3:5], "big")
+            self.header.clear()
+            if kind == 20:
+                self.ccs = True
+            elif kind == 22 and self.ccs:
+                self.tls12 = True
+            elif kind == 23:
+                self.encrypted_records += 1
+                self.application_started = self.tls12 or self.encrypted_records >= 2
+
+
 class Relay:
     """A private UNIX socket transports TLS without inspecting its contents."""
 
-    def __init__(self, path, control, stats):
+    def __init__(self, path, control, stats, connector=None):
         self.path, self.control, self.stats = path, control, stats
         self.stop = threading.Event()
         self.connections = set()
         self.lock = threading.Lock()
-        self.counters = {"connected": 0, "client_records": 0, "held_replies": 0}
+        self.connector = connector
+        self.counters = {
+            "connected": 0,
+            "client_records": 0,
+            "held_replies": 0,
+            "application_connections": 0,
+        }
         self.listener = socket.socket(socket.AF_UNIX)
         self.listener.bind(str(path))
         self.listener.listen()
@@ -72,10 +122,12 @@ class Relay:
                 for suffix in (".1password.com", ".1password.eu", ".1password.ca")
             ):
                 return
-            upstream = socket.create_connection((host, 443), timeout=10)
+            connector = self.connector or socket.create_connection
+            upstream = connector((host, 443), timeout=10)
             self.connections.add(upstream)
             self.bump("connected")
             client.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+            gate = TLSApplicationGate()
             while not self.stop.is_set():
                 ready, _, _ = select.select([client, upstream], [], [], 0.2)
                 for source in ready:
@@ -83,14 +135,24 @@ class Relay:
                     if not data:
                         return
                     if source is client:
+                        was_application = gate.application_started
+                        gate.feed(data)
+                        if gate.application_started and not was_application:
+                            self.bump("application_connections")
                         self.bump("client_records")
                         upstream.sendall(data)
                     else:
-                        stalled = self.control.read_text().strip() == "stall"
+                        mode = self.control.read_text().strip()
+                        stalled = mode == "handshake-stall" or (
+                            mode == "stall" and gate.application_started
+                        )
                         if stalled:
                             self.bump("held_replies")
                         while stalled and not self.stop.wait(0.05):
-                            stalled = self.control.read_text().strip() == "stall"
+                            mode = self.control.read_text().strip()
+                            stalled = mode == "handshake-stall" or (
+                                mode == "stall" and gate.application_started
+                            )
                         if self.stop.is_set():
                             return
                         client.sendall(data)

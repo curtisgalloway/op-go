@@ -43,8 +43,40 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
   unmodified candidate. The temporary keyring and private daemons were cleaned up.
   Normal/race Go tests, vet, and pinned vulnerability scanning passed. Script
   tests passed except for the apt-repository test, skipped because its tools were
-  unavailable. Actual SDK stalls, live lookup comparisons, and live observation
-  on the new candidate await local credential entry.
+  unavailable.
+- The subsequent live run passed all twenty fresh-process reads (five for each
+  name/ID combination), exact harmless-value comparisons, authentication-variable
+  filtering, sampled process exposure checks, and synchronized post-exec child
+  observation. Historical lookup intermittency was not reproduced, not proven
+  fixed. The first network-stall test then failed its status assertion: expected
+  20, received 10 after 11.459 seconds. Its 29.5–35-second timing assertion was
+  not reached. The original report is preserved separately. One held relay reply
+  confirms traffic reached the forwarding path, but the relay stalled TLS before
+  handshake completion. Go's default transport has a ten-second TLS handshake
+  timeout. Source-based attribution places the resulting status 10 on the SDK
+  initialization error path; the failed uninstrumented run has no direct phase
+  checkpoint. This is a demonstrated test setup/expectation error, not evidence
+  of a broken thirty-second launcher deadline. Initialization's generic status
+  10 must not be interpreted as proof of an invalid token.
+- That failing harness version raised before recording the explicit child-marker
+  and worker-exit checks. No additional child checkpoint appears, and source flow
+  indicates initialization failed before exec after credential-worker reaping,
+  but independent final observations were not retained. The report confirms
+  keyring/relay cleanup and namespace-controller exit; subsequent inspection
+  confirmed the temporary keyring and its private daemon PIDs were absent.
+  The five-second SDK stall, restored-network control, and instrumented
+  resolution-stage stalls did not run and remain untested.
+- The relay now permits TLS negotiation before holding application replies;
+  deadline/status assertions are unchanged. A credential-free local TLS transport
+  reproduction measured the original behavior at 10.013 seconds with no completed
+  handshake and an unexpired thirty-second context. The repaired forwarding path
+  completed certificate verification and request writing, then hit context
+  deadlines at 30.026 and 5.000 seconds; a restored-forwarding control succeeded.
+  These are transport-fixture results, not SDK or real-account timeout evidence.
+  Targeted framing/forwarding and failure-evidence regression tests passed. The
+  harness now preserves attempt diagnostics before raising and supports a
+  network-only rerun without repeating the successful lookup matrix. A live
+  network-only rerun awaits fresh hidden local enrollment.
 - PR #6 CI subsequently reported reachable standard-library vulnerability
   `GO-2026-6809` in Go 1.26.9 on both native platforms: compromised intermediate
   certificates in `crypto/x509`. The minimum Go version is now 1.26.10, the
