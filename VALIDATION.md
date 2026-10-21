@@ -49,6 +49,23 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
   and interactive removal consent remain untested in this run. Cleanup completed:
   the disposable keyring was deleted and its private services stopped; the
   desktop enrollment was unchanged.
+- A second user-operated run completed all 28 recorded live checks for that
+  candidate on the same GNOME Keyring version. Hidden enrollment and metadata,
+  exact dedicated-test-value delivery, and authentication-variable filtering
+  passed. Declining overwrite returned 2 and preserved live delivery; approved
+  replacement returned 0 and subsequent delivery passed. Locked doctor and run
+  returned 11 in 0.006 and 0.005 seconds respectively, without child execution.
+  One incorrect disposable keyring password returned 11 without retry; a separate
+  correct attempt unlocked and live delivery passed again. The password was
+  generated in memory and supplied through op-go's hidden terminal prompt; the
+  desktop password was not used. Declining removal returned 2 and preserved
+  delivery; approved removal returned 0 and doctor then returned 3. A genuinely
+  stalled store request returned 20 after 5.009 seconds. All three interruption
+  checks restored terminal echo. The report recorded successful cleanup, and
+  subsequent inspection confirmed the temporary store and both private daemons
+  were absent. The first run's incomplete consent checks are thus covered by
+  this second run. Neither run qualifies desktop graphical prompt behavior or
+  a stalled SDK network request.
 - The release infrastructure was exercised locally with disposable candidates:
   a Developer ID-signed universal macOS binary passed signature verification,
   the signed offline SDK validator and the CLI smoke contract. Both Linux
@@ -256,17 +273,21 @@ CI uses a private D-Bus instance and fake values. No real 1Password account is n
 
 - Exercise dedicated test items in actual Keychain and Secret Service stores:
   enroll, read, overwrite, remove, locked-store refusal, and denial without prompts.
+  The Linux isolated GNOME Keyring 50.0 lifecycle and private-bus denial checks
+  above are complete; this does not qualify other providers or desktop GUI policy.
 - Verify Keychain item access with the chosen macOS signing identity and after an
   upgrade. The login-Keychain APIs used to disable interaction and check lock state
   compile but are deprecated by Apple; their behavior must be qualified on each
   supported macOS version.
-- Authenticate to 1Password with a dedicated, narrowly scoped test account and
-  resolve a dedicated test item. The live smoke check used an existing read-only
-  account and application item. Verify timeout behavior during a stalled request
-  and investigate the observed name/ID lookup failures.
+- Dedicated-account exact delivery is now verified on Linux. Verify SDK timeout
+  behavior during an actual stalled network request and investigate the earlier
+  name/ID lookup failures; the successful dedicated-item checks do not establish
+  their cause. Store-request timeout evidence is separate from SDK network evidence.
 - Inspect process arguments/environments during enrollment, retrieval, and launch
   with test sentinels on both operating systems. The macOS live launch sampling
-  above does not cover enrollment, every retrieval worker, or Linux inspection.
+  above does not cover enrollment or every retrieval worker. Linux synthetic
+  sampling covers enrollment and failed retrieval/launch, but hidden enrollment,
+  complete worker coverage, and successful launch need further targeted evidence.
 
 Real-store and real-account checks are intentionally separate from default tests
 and require explicit authorization. No credentials are embedded in examples,
