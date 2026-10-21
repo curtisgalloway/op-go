@@ -11,6 +11,7 @@ import (
 	"errors"
 	"flag"
 	"os"
+	"runtime"
 	"time"
 
 	onepassword "github.com/1password/onepassword-sdk-go"
@@ -29,7 +30,11 @@ func main() {
 	if _, exists := os.LookupEnv("OP_SERVICE_ACCOUNT_TOKEN"); exists {
 		os.Exit(12)
 	}
-	s, err := store.Open("secret-service", "")
+	backend := "secret-service"
+	if runtime.GOOS == "darwin" {
+		backend = "keychain"
+	}
+	s, err := store.Open(backend, "")
 	if err != nil {
 		os.Exit(3)
 	}

@@ -429,6 +429,11 @@ CI uses a private D-Bus instance and fake values. No real 1Password account is n
 
 ### Recommended order for closing the gaps
 
+Repeatable build and test commands for both platforms are checked in under
+[scripts/qualification](scripts/qualification/README.md). Private reports and
+generated binaries remain outside version control. A checked-in test is not
+evidence of a live pass until its recorded run completes.
+
 1. **Review and integrate the combined evidence.** The Linux network/process
    branch records both the original TLS-handshake stall failure and the repaired
    live run. Preserve both. The failure was a test-placement error, not proof

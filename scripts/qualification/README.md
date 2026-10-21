@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 Curtis Galloway
 SPDX-License-Identifier: Apache-2.0
 -->
 
-# Linux network and process qualification
+# macOS and Linux release qualification
 
 **Terms:** A network namespace is a separate set of Linux network interfaces and
 routes. D-Bus is the local messaging service used by GNOME Keyring. A checkpoint
@@ -12,9 +12,96 @@ A CONNECT proxy forwards encrypted TLS traffic without decrypting it. SDK means
 the official 1Password library. See [the glossary](../../GLOSSARY.md).
 
 These scripts are opt-in qualification tools, separate from default tests. They
-require an existing GNOME Keyring installation and dedicated test account. They
-do not install software, use the desktop keyring, or change host firewall/DNS
-configuration. Obtain approval before using the privileged namespace setup.
+require a dedicated test account for live runs and never install system software.
+Synthetic runs need no real credentials. Logs, tokens, account IDs, and generated
+binaries must not be checked in. Use the gitignored `release-logs/` directory for
+local artifacts. Keep every report under a new filename to preserve failures.
+
+## Build once from a committed revision
+
+From the repository root, on either supported platform, run the following. The
+output directory must not already exist. Go and Python 3 are required. On macOS,
+the configured Developer ID signing identity must be available; missing signing
+credentials are an error, never a reason to use ad hoc signatures.
+
+```sh
+python3 scripts/qualification/build.py --output release-logs/qualification-build
+```
+
+The builder archives committed `HEAD` into a separate directory, builds there,
+and writes `manifest.json` with source revision, toolchain, and executable hashes.
+Uncommitted source changes are deliberately excluded. The baseline and candidate have different embedded development versions but
+the same source revision. The candidate has no instrumentation; the instrumented executable is a separate test artifact, never
+something to publish. The native macOS signing script runs its signed offline
+SDK validator for both CLI builds. Probes use the same signing identifier,
+identity, hardened runtime and entitlements. Offline candidate smoke tests run
+on both platforms. These local builds are not notarized release packages.
+
+## macOS operation
+
+`run_macos.py` temporarily makes a disposable Keychain the user's default.
+It never locks the login Keychain or edits its entries, but another application
+creating credentials during that interval could use the temporary default.
+Close those applications first. The script asks before switching, saves recovery
+commands, restores and verifies the original default/search list, and deletes
+only the test Keychain. If restoration fails it preserves the temporary store.
+SIGKILL or power loss requires the saved recovery commands.
+
+First run the synthetic checks. These automate hidden terminal input with a
+pseudo-terminal, observe every reported instrumented worker at request/result
+checkpoints, and exercise replacement, retrieval, synthetic successful launch,
+removal, and locked/denied access. They do not authenticate to 1Password.
+
+```sh
+python3 scripts/qualification/run_macos.py --synthetic --binary release-logs/qualification-build/candidate --instrumented release-logs/qualification-build/instrumented --probe release-logs/qualification-build/probe --report release-logs/macos-synthetic.json
+```
+
+After that passes, set the dedicated test item's harmless value as described
+below and run the live network checks in your terminal. Enter the service-account
+token only at op-go's hidden prompt. The observer obtains its comparison token
+over a private pipe and retains it only in memory. This run tests a same-path signed upgrade, twenty name/ID lookups, the candidate
+at the default and five-second deadlines, separate instrumented initialization
+and resolution stalls, and restored-network controls. It prompts for nonsecret
+vault/item IDs unless `--ids` supplies a private JSON file. Add `--network-only`
+to skip upgrade/lookup checks that already passed against these candidates.
+
+```sh
+python3 scripts/qualification/run_macos.py --live --binary release-logs/qualification-build/candidate --instrumented release-logs/qualification-build/instrumented --probe release-logs/qualification-build/probe --report release-logs/macos-network-live.json
+```
+
+The macOS observer reads arguments/environments with `ps` at synchronized
+checkpoints; it rejects failed reads instead of treating them as clean evidence.
+Coverage applies to those processes and checkpoints, not arbitrary memory or
+every instant of the uninstrumented candidate. A per-process loopback proxy
+provides verified TLS forwarding without host firewall, DNS or proxy changes.
+Unlike Linux, macOS has no network namespace in this harness: each stalled test
+must show an actual held application reply in the relay counters. A pass with
+no such evidence is not accepted.
+
+## Linux operation
+
+The existing `run.py` uses private D-Bus sessions, disposable GNOME Keyring stores,
+and a private network namespace. Obtain approval for its privileged namespace
+setup. It does not modify desktop credentials or host firewall/DNS configuration.
+Read the local-operation section below for live IDs, reports and recovery.
+Run `--synthetic` first; `--preflight` checks namespace/verified HTTPS forwarding;
+then run the live checks. Use `--network-only` for an affected-check rerun.
+All four executables from the shared builder are suitable for those arguments.
+
+## Automated tests and credential-free transport checks
+
+On both platforms, the portable regression tests verify TLS framing, forwarding,
+checkpoint-observer failure handling and cleanup. The process-report regression
+uses Linux `/proc` and explicitly skips on macOS; Linux CI must run it.
+
+```sh
+python3 -m unittest discover -s scripts/tests -p 'test_qualification_*.py' -v
+python3 scripts/qualification/check_transport.py --probe release-logs/qualification-build/transport-probe --report release-logs/transport-check.json
+```
+
+The second command takes about 45 seconds and uses a local disposable TLS server,
+not a real account. It distinguishes a handshake timeout from a stalled request.
+Its success does not replace either platform's live SDK test.
 
 ## Builds and evidence boundaries
 
@@ -31,7 +118,7 @@ resolver fixture for testing successful execution without a real token. That
 fixture is never enabled for live checks and is absent from the release candidate.
 
 The probe under `probe/` is a minimal SDK-only comparison executable. It retrieves
-credentials from the isolated real keyring using the existing credential worker.
+credentials from the selected platform store (macOS Keychain or Linux Secret Service) using the existing credential worker.
 Its observer export mode writes only to a supplied private pipe, never stdout,
 arguments, an environment variable, or a token file. The observer retains the
 comparison token only in memory. Its ordinary mode emits sanitized status,

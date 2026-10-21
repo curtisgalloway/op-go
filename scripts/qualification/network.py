@@ -236,6 +236,14 @@ class Observer:
         self.listener.listen()
         threading.Thread(target=self.accept, daemon=True).start()
 
+    def inspect(self, pid):
+        """Read only the checkpoint process; never persist its raw data."""
+        exposed = False
+        for field in ("cmdline", "environ"):
+            data = Path(f"/proc/{pid}/{field}").read_bytes()
+            exposed |= bool(self.token) and self.token in data
+        return exposed
+
     def descendant(self, pid):
         while pid > 1:
             process = self.process_getter()
@@ -276,10 +284,7 @@ class Observer:
                         time.sleep(0.001)
                     if not self.descendant(pid):
                         raise ValueError("not a test descendant")
-                    exposed = False
-                    for field in ("cmdline", "environ"):
-                        data = Path(f"/proc/{pid}/{field}").read_bytes()
-                        exposed |= bool(self.token) and self.token in data
+                    exposed = self.inspect(pid)
                     self.events.append(
                         {
                             "phase": event["Phase"],
