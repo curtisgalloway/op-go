@@ -12,6 +12,17 @@ systems, and credential stores, not every supported platform.
 
 ## Observed checks
 
+- The first macOS live network run stopped at the pre-stall exact-value control:
+  status 10 after 1.685 seconds, before any network-stall attempt. The original
+  private report was inspected and preserved. Its relay was in pass-through
+  mode, with one connection, one application connection, four client records,
+  and zero held replies. The source maps SDK initialization failures to status
+  10; this does not independently establish invalid credentials. No checkpoint
+  or child execution was observed, and the report retained no surviving observed
+  process. The temporary Keychain default/search list were restored and cleanup
+  succeeded. No actual macOS SDK stall has passed. A separate, explicitly
+  requested direct control is needed to distinguish forwarded-path behavior
+  from account/SDK initialization failure; authentication was not retried.
 - The checked-in macOS qualification runner was exercised from build source
   `071cbe5` with Go 1.27.3. Its synthetic run passed all 62 recorded checks,
   including hidden terminal enrollment and echo restoration, piped replacement,

@@ -69,6 +69,14 @@ to skip upgrade/lookup checks that already passed against these candidates.
 python3 scripts/qualification/run_macos.py --live --binary release-logs/qualification-build/candidate --instrumented release-logs/qualification-build/instrumented --probe release-logs/qualification-build/probe --report release-logs/macos-network-live.json
 ```
 
+If the pre-stall live control returns status 10, stop: SDK initialization
+failed before the deadline test. Status 10 does not by itself establish an invalid
+token. After reviewing the failure, `--live --direct-control` performs one
+explicitly requested control without creating a proxy or retrying a failed
+operation. Use a new report filename and the same dedicated test account.
+A direct success narrows the difference to the forwarded path; a direct failure
+requires account/SDK investigation before further authenticated attempts.
+
 The macOS observer reads arguments/environments with `ps` at synchronized
 checkpoints; it rejects failed reads instead of treating them as clean evidence.
 Coverage applies to those processes and checkpoints, not arbitrary memory or

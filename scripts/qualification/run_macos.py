@@ -135,7 +135,7 @@ class MacQualification(Qualification):
         self.observer.process_getter = lambda: self.active
         self.observer.token = b"" if self.args.live else self.token
         self.env["OP_GO_QUALIFICATION_SOCKET"] = str(self.observer.path)
-        if self.args.live:
+        if self.args.live and not self.args.direct_control:
             self.relay = Relay(
                 self.root / "relay", self.root / "mode", self.root / "stats"
             )
@@ -145,7 +145,7 @@ class MacQualification(Qualification):
                 HTTP_PROXY=f"http://localhost:{self.bridge.port}",
                 NO_PROXY="",
             )
-        else:
+        elif not self.args.live:
             self.env["OP_GO_QUALIFICATION_SYNTHETIC"] = "1"
 
         self.original = shlex.split(self.security("default-keychain", "-d", "user"))
@@ -244,6 +244,7 @@ class MacQualification(Qualification):
             surviving_observed_pids=survivors,
             checkpoint_phases=sorted({e["phase"] for e in events}),
             output_token_exposure=exposed,
+            relay_counters=self.stats(),
         )
         self.report["operations"].append(operation)
         # Record evidence before raising so failed stalls retain diagnostics.
@@ -352,7 +353,7 @@ class MacQualification(Qualification):
 
     def live(self):
         original = self.args.binary
-        if not self.args.network_only:
+        if not (self.args.network_only or self.args.direct_control):
             baseline = self.args.baseline or (original.parent / "baseline")
             self.record(
                 "upgrade binaries differ",
@@ -369,7 +370,7 @@ class MacQualification(Qualification):
             self.env["OP_GO_QUALIFICATION_SOCKET"] = socket_path
         self.load_observer_token()
         self.env.update(OP_CONNECT_TOKEN="fake", OP_SESSION_TEST="fake")
-        if not self.args.network_only:
+        if not (self.args.network_only or self.args.direct_control):
             refs = self.root / "upgrade.env"
             refs.write_text("TEST_VALUE=op://Test Vault/API Credentials/username\n")
             marker = self.root / "upgrade-child"
@@ -421,7 +422,22 @@ class MacQualification(Qualification):
                     time.sleep(1)
             self.report["lookup_conclusion"] = "not reproduced, not proven fixed"
         self.args.binary = original
-        self.network_checks()
+        if self.args.direct_control:
+            refs = self.root / "direct.env"
+            refs.write_text("TEST_VALUE=op://Test Vault/API Credentials/username\n")
+            self.cli(
+                "direct exact-value control without proxy",
+                [
+                    "run",
+                    "--env-file",
+                    refs,
+                    "--",
+                    *self.target(self.root / "direct-child"),
+                ],
+                limit=45,
+            )
+        else:
+            self.network_checks()
         self.cli("live enrollment removal", ["remove", "--yes"])
         self.cli("live absence", ["doctor", "--json"], expected=3)
 
@@ -478,6 +494,11 @@ def main():
         action="store_true",
         help="skip already-passing upgrade and lookup checks",
     )
+    parser.add_argument(
+        "--direct-control",
+        action="store_true",
+        help="one live exact-value check without the proxy; stops on failure",
+    )
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--synthetic", action="store_true")
     mode.add_argument("--live", action="store_true")
@@ -497,6 +518,8 @@ def main():
         )
     if args.live and not os.isatty(0):
         parser.error("live checks require a terminal")
+    if args.direct_control and (not args.live or args.network_only):
+        parser.error("--direct-control requires --live and cannot use --network-only")
     os.umask(0o077)
     print(
         "Temporarily switching the default Keychain.\n"

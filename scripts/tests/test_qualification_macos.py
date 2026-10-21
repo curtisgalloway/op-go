@@ -92,6 +92,39 @@ class FailureEvidenceTests(unittest.TestCase):
             self.assertGreaterEqual(attempt["operation"]["seconds"], 0)
 
 
+class DirectControlTests(unittest.TestCase):
+    """The requested comparison cannot accidentally enable proxy or fake resolution."""
+
+    def test_direct_control_uses_neither_proxy_nor_synthetic_resolver(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = SimpleNamespace(
+                binary=Path(sys.executable),
+                instrumented=Path(sys.executable),
+                live=True,
+                direct_control=True,
+            )
+            with patch.object(MAC.tempfile, "mkdtemp", return_value=directory):
+                q = MAC.MacQualification(args)
+            replies = [
+                '"original"',
+                '"original"',
+                "",
+                "",
+                "",
+                '"' + str(q.keychain) + '"',
+            ]
+            with patch.object(MAC, "MacObserver"), patch.object(
+                MAC, "Relay"
+            ) as relay, patch.object(MAC, "Bridge") as bridge, patch.object(
+                q, "security", side_effect=replies
+            ):
+                q.setup()
+                relay.assert_not_called()
+                bridge.assert_not_called()
+            self.assertNotIn("OP_GO_QUALIFICATION_SYNTHETIC", q.env)
+            self.assertFalse(any(k.lower().endswith("_proxy") for k in q.env))
+
+
 class CleanupTests(unittest.TestCase):
     """Failure to restore defaults must never trigger store deletion."""
 
