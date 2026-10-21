@@ -320,6 +320,39 @@ supported platform.
   any exec that follows network use. Both failure reports are preserved
   locally. A rebuilt candidate must pass the package-upgrade check before
   publication.
+- With the fix merged as `f68152d`, release dry run
+  [39652691403](https://github.com/curtisgalloway/op-go/actions/runs/39652691403)
+  passed every build and install job; notarization was Accepted and all nine
+  artifacts matched their sidecars. Its archive, disk image and bottle carry
+  one Go 1.26.10 executable (SHA-256
+  `64b30279e070a8f6bd0aab062b344202ef0ea5f61834c9ab43f1fbb14e0db1ce`). The
+  package-upgrade check then passed all 33 recorded checks on 2026-10-21:
+  Gatekeeper notarized Developer ID, matching designated requirement, hidden
+  enrollment with the signed development baseline, baseline delivery and its
+  immediate repeat, exact delivery after same-path replacement and from a new
+  versioned path in about 3.3 seconds each, no permission prompt or trust
+  repair (operator-confirmed), removal, and missing-enrollment status 3.
+  Cleanup restored the default Keychain and deleted the disposable store.
+- **v0.1.0 published** on 2026-10-21 from annotated tag `v0.1.0` on `f68152d`
+  (release run
+  [39656513647](https://github.com/curtisgalloway/op-go/actions/runs/39656513647)).
+  All build, install, publish and channel-update jobs passed, and
+  `verify-published` downloaded, checksum-checked and smoke-tested the public
+  archives on all four native runners. Independently, all seven downloaded
+  public assets matched their sidecars; the public macOS executable reports
+  `f68152d`, Gatekeeper assesses it as notarized Developer ID, and the disk
+  image's stapled ticket validates. The tap's bump workflow succeeded, and
+  every bottle and source hash in the published formula matches the release
+  assets. In disposable Linux containers on arm64 and amd64 (amd64 under
+  Rosetta translation), `brew install --force-bottle
+  curtisgalloway/tap/op-go` poured the Linux bottle, `brew test` passed, and
+  the smoke contract S1–S5 passed. The apt site deployed with a 30-day
+  `Valid-Until`; following the README in fresh Ubuntu 24.04 containers on both
+  architectures, the downloaded key matched the documented fingerprint, apt
+  authenticated the signed index, installed exactly 0.1.0, and S1–S5 passed.
+  A macOS Homebrew install from the public tap was not repeated locally, to
+  avoid changing the developer's installed software; the release's native
+  macOS Homebrew and verify-published jobs cover that channel.
 - Native macOS 27.0.1 arm64 checks with Go 1.27.2 passed for `9b8ebf6`:
   normal and race tests, formatting, vet, build, and the pinned vulnerability
   scan. CLI smoke checks passed for JSON output, literal environment delivery,
@@ -517,7 +550,7 @@ CI uses a private D-Bus instance and fake values. No real 1Password account is n
 | Process exposure | Linux synchronized synthetic/live checks; macOS synchronized synthetic/live worker checks | Instrumentation does not establish universal candidate coverage |
 | SDK network timeout | Linux live candidate deadlines at 30.048/5.023 seconds; macOS live candidate deadlines at 30.037/5.047 seconds; separate instrumented initialization/resolution checks and recovery passed on both platforms | Coverage applies to the tested builds and forwarding setup |
 | Name/ID lookups | All 20 source-pinned matrix reads passed on each platform | Closed: the maintainer attributes the earlier failures to operator error. Documentation recommends IDs; names remain supported |
-| Distribution | Signing/notarization and native four-platform install dry runs passed; notarized-package upgrade found and fixed an exec failure on the Go 1.26.10 release toolchain | Package-upgrade check on a rebuilt candidate; post-publication Homebrew/apt checks |
+| Distribution | v0.1.0 published; notarized-package upgrade, GitHub Releases, Homebrew tap and apt verified from public URLs | Repeat the release checks for each new version |
 
 ### Recommended order for closing the gaps
 
@@ -556,9 +589,11 @@ evidence of a live pass until its recorded run completes.
 
 Real-store and real-account checks remain separate from default tests and
 require explicit authorization. No credentials are embedded in examples,
-fixtures, logs, or this document. Keep `RELEASE_QUALIFIED` unset until the
-remaining pre-publication requirements and any explicit scope decisions have
-been reviewed; this consolidation does not approve publication.
+fixtures, logs, or this document. `RELEASE_QUALIFIED` was set for v0.1.0 after
+the checks above passed. A later release still needs its own dry run, review of
+any changes to credential, launch or packaging code, and explicit approval of
+its version before tagging; the protected release environment remains the final
+gate.
 
 ## Dependency selection
 
