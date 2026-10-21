@@ -5,9 +5,10 @@ system libraries. D-Bus is the local messaging protocol used by Linux Secret
 Service. See [GLOSSARY.md](GLOSSARY.md).
 
 This development implementation has automated evidence for its command and
-credential-transport behavior and macOS and Linux real-account smoke checks. It has not
-completed signed-release qualification. A green suite does not prove Keychain
-access after a binary upgrade or behavior of every Linux desktop keyring.
+credential-transport behavior, dedicated-account checks on macOS and Linux,
+and a user-operated macOS signed-build upgrade check. It has not completed
+signed-release qualification. Results apply to the tested builds, operating
+systems, and credential stores, not every supported platform.
 
 ## Observed checks
 
@@ -19,6 +20,29 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
   build, the offline CLI smoke contract, and the release-profile check passed. Earlier
   real-keyring results below remain evidence for their recorded Go 1.26.9
   candidate; they do not qualify a rebuilt release candidate automatically.
+- During the 2026-10-20 validation session, the user supplied successful
+  terminal transcripts from macOS 27.0.1 ARM64 using a dedicated test service
+  account and disposable application value. Hidden enrollment, metadata,
+  exact nonempty child-environment delivery, and absence of authentication
+  variables passed. The child checked `OP_SERVICE_ACCOUNT_TOKEN`,
+  `OP_CONNECT_TOKEN`, and every `OP_SESSION_` variable; the latter two types
+  were seeded with harmless dummy values. Approved overwrite and subsequent
+  delivery passed. A second Developer ID-signed build changed the embedded
+  version from `0.1.0-dev` to `0.1.1-dev`; the script required different binary
+  bytes and verified live retrieval without re-enrollment. Removal succeeded
+  and metadata inspection then returned missing-enrollment status 3. Both
+  builds passed the signed offline SDK validator. These were local signed,
+  non-notarized builds, not downloaded release packages; their embedded commit
+  and date were `unknown`, so the transcripts do not pin the source commit.
+- A second user-supplied macOS transcript verified an isolated temporary
+  Keychain with synthetic invalid token data. Locked metadata/read checks
+  returned status 11; a restricted item's metadata remained readable, while
+  token access returned status 12. Neither failed launch executed its child.
+  The user confirmed no graphical permission prompts. The script restored
+  the original default Keychain and search list and removed the temporary
+  Keychain. These results close the tested platform's locked/denied cases;
+  they do not qualify other macOS versions or establish process-exposure
+  coverage. The developer's test enrollment was removed by the first script.
 - On 2026-10-20, a clean-source Linux amd64 candidate from
   `27de464d7f1f4db40154c2d65abc1daa4ec1d5d2` built with Go 1.26.9 and
   cgo disabled passed real GNOME Keyring 50.0 checks on Ubuntu 26.04.1.
@@ -277,29 +301,77 @@ access after a binary upgrade or behavior of every Linux desktop keyring.
 The automated tests do not read or modify the user's Keychain or desktop keyring.
 CI uses a private D-Bus instance and fake values. No real 1Password account is needed.
 
-## Checks required before a supported release
+## Qualification summary and remaining checks
 
-- Exercise dedicated test items in actual Keychain and Secret Service stores:
-  enroll, read, overwrite, remove, locked-store refusal, and denial without prompts.
-  The Linux isolated GNOME Keyring 50.0 lifecycle and private-bus denial checks
-  above are complete; this does not qualify other providers or desktop GUI policy.
-- Verify Keychain item access with the chosen macOS signing identity and after an
-  upgrade. The login-Keychain APIs used to disable interaction and check lock state
-  compile but are deprecated by Apple; their behavior must be qualified on each
-  supported macOS version.
-- Dedicated-account exact delivery is now verified on Linux. Verify SDK timeout
-  behavior during an actual stalled network request and investigate the earlier
-  name/ID lookup failures; the successful dedicated-item checks do not establish
-  their cause. Store-request timeout evidence is separate from SDK network evidence.
-- Inspect process arguments/environments during enrollment, retrieval, and launch
-  with test sentinels on both operating systems. The macOS live launch sampling
-  above does not cover enrollment or every retrieval worker. Linux synthetic
-  sampling covers enrollment and failed retrieval/launch, but hidden enrollment,
-  complete worker coverage, and successful launch need further targeted evidence.
+| Area | Evidence and scope | Remaining work |
+|---|---|---|
+| macOS credential lifecycle | User transcripts: enrollment, approved replacement, exact live delivery, filtering, removal on macOS 27.0.1 ARM64 | Does not establish declined-consent behavior or other macOS versions |
+| macOS signed upgrade | Different signed development binaries retained access without re-enrollment | Repeat with source-pinned candidate packages; local builds reported unknown commit/date |
+| macOS locked/denied reads | Temporary real Keychain; statuses 11/12; no child or GUI prompt | Qualify additional supported macOS versions or explicitly limit support |
+| Linux credential lifecycle | Dedicated-account checks, consent, lock/unlock, denial and cleanup on Ubuntu 26.04.1 / GNOME Keyring 50.0, source-pinned amd64 candidate | Desktop graphical prompt behavior and other providers are not established |
+| Store timeout | Stopped real Linux keyring daemon; status 20 after about five seconds | Separate from SDK network timeout |
+| Process exposure | Prior macOS live sampling and Linux synthetic enrollment/failed-launch sampling | Hidden enrollment, successful launch, and short-lived worker coverage remain incomplete |
+| SDK network timeout | Automated cancellation tests; no actual stalled-network result | Exercise a real stalled SDK request |
+| Name/ID lookups | Successful dedicated-item resolution and earlier diagnostic matrix | Earlier intermittent failures remain unexplained |
+| Distribution | Signing/notarization and native four-platform install dry run passed | Final candidate verification and post-publication Homebrew/apt checks |
 
-Real-store and real-account checks are intentionally separate from default tests
-and require explicit authorization. No credentials are embedded in examples,
-fixtures, logs, or this document.
+### Recommended order for closing the gaps
+
+1. **Pin the candidate and preserve evidence.** Integrate the Linux validation
+   changes and this macOS record through passing CI. Record the exact candidate
+   commit, executable checksums, signing identity, OS and provider versions in
+   private run records. Repeat the macOS upgrade check using source-pinned
+   signed candidates; do not overwrite an existing enrollment merely to make
+   a failed upgrade pass. Keep support claims limited to qualified environments.
+2. **Exercise a real SDK network stall.** In a disposable Linux network
+   environment, first verify successful resolution with the dedicated account.
+   Then delay or drop response traffic for that test process's actual SDK
+   connection. Preserve access to the isolated local credential store. Confirm
+   the request reached the network and remained pending; an immediate DNS,
+   connection-refused, authentication, or certificate error is not a stall.
+   Test both the normal 30-second SDK deadline and a shorter nonzero deadline,
+   measuring elapsed time and expecting status 20 with no child execution and
+   no surviving worker. Allow bounded scheduling/cleanup overhead and document
+   it. Do not disable TLS verification, record packet payloads, or alter the
+   host's shared firewall. First inspect the pinned SDK's transport support;
+   do not assume it honors HTTP proxy environment variables. Repeat on macOS
+   or state explicitly that only Linux transport behavior was exercised.
+3. **Close the process-observation gaps.** Use synthetic sentinel tokens
+   (distinctive disposable strings) to inspect hidden enrollment, replacement,
+   credential retrieval, and every private worker on both operating systems.
+   Use synchronized test checkpoints where necessary so short-lived workers
+   cannot simply escape the observation window. For successful live launch,
+   use the dedicated test account; any comparison with its actual token must
+   remain in memory and emit only pass/fail. Never persist process dumps or
+   token values, lengths, or fingerprints. Verify the child still receives the
+   harmless application value and excludes authentication variables. Clearly
+   distinguish observations of the actual candidate from instrumented builds;
+   sampling alone cannot establish absence from every inspection interface.
+4. **Bound the lookup investigation.** On the same dedicated item, compare
+   names/names, names/IDs, IDs/names, and IDs/IDs in fresh processes on both
+   systems, using supported names and exact-value assertions. Start with five
+   runs per combination and space calls to avoid rate limits. Record only
+   timing, sanitized error category, platform and SDK version. Stop on an
+   authentication failure or rate limit; do not automatically retry it. On a
+   lookup failure, preserve the category and reproduce with a small SDK-only
+   program and the official CLI, using their supported credential handling.
+   A clean matrix bounds current reproducibility; it does not explain history.
+   If the old failure remains unreproduced, document that residual limitation
+   and obtain an explicit release decision rather than declaring a fix or
+   claiming ID references eliminate the issue.
+5. **Finish distribution verification at the appropriate stage.** Re-run
+   candidate build/install checks if code or packaging changes. After the
+   approved stable release, confirm the tap update and apt deployment, then
+   install the published exact version in disposable environments and verify
+   checksums, signing and smoke checks. Dispatch acceptance is not evidence
+   of a successful channel update. These post-publication checks cannot be
+   claimed before assets and repositories exist.
+
+Real-store and real-account checks remain separate from default tests and
+require explicit authorization. No credentials are embedded in examples,
+fixtures, logs, or this document. Keep `RELEASE_QUALIFIED` unset until the
+remaining pre-publication requirements and any explicit scope decisions have
+been reviewed; this consolidation does not approve publication.
 
 ## Dependency selection
 
